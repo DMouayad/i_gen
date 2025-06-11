@@ -1,0 +1,10 @@
+{
+    "@@locale": "en",
+    "productModel": "Model",
+    "productDescription": "Description",
+    "quantity": "Quantity",
+    "price": "Price",
+    "lineTotal": "Line Total",
+    "total": "Total",
+    "addItem": "Add Item"
+}
