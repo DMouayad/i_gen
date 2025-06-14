@@ -12,10 +12,11 @@ class InvoiceBtns extends StatelessWidget {
   final InvoiceDetailsController controller;
   final VoidCallback onExportAsImage;
   final VoidCallback onExportAsPdf;
+
   @override
   Widget build(BuildContext context) {
     final filledBtnStyle = ButtonStyle(
-      minimumSize: WidgetStatePropertyAll(Size(120, 54)),
+      minimumSize: WidgetStatePropertyAll(Size(130, 54)),
       textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 18)),
     );
 
@@ -29,7 +30,7 @@ class InvoiceBtns extends StatelessWidget {
             spacing: 10,
             overflowSpacing: 30,
             children: [
-              if (Navigator.of(context).canPop())
+              if (Navigator.of(context).canPop()) ...[
                 FilledButton.tonal(
                   onPressed: () {
                     Navigator.of(context).pop();
@@ -37,6 +38,35 @@ class InvoiceBtns extends StatelessWidget {
                   style: filledBtnStyle,
                   child: Text('Go back'),
                 ),
+              ],
+              ValueListenableBuilder(
+                valueListenable: controller.textSizeNotifier,
+                builder: (context, value, _) {
+                  return SizedBox(
+                    height: 100,
+                    child: OverflowBar(
+                      alignment: MainAxisAlignment.center,
+                      overflowAlignment: OverflowBarAlignment.center,
+                      children: [
+                        Text(
+                          "Text Size is ${value.floor()}",
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        Slider(
+                          min: 10,
+                          max: 26,
+                          value: value.toDouble(),
+                          // divisions: 1,
+                          onChanged: (value) {
+                            controller.textSizeNotifier.value = value.floor();
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
               FilledButton.icon(
                 onPressed: () {
                   if (controller.hasUnsavedChanges) {
@@ -88,10 +118,9 @@ class InvoiceBtns extends StatelessWidget {
               ),
             ],
           ),
-          crossFadeState:
-              editingEnabled
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
+          crossFadeState: editingEnabled
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
           duration: Duration(milliseconds: 300),
         );
       },

@@ -102,27 +102,31 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                       : invoices.isEmpty
                       ? Text('No invoices found')
                       : Container(
-                        padding: EdgeInsets.symmetric(vertical: 50),
-                        height: context.height,
-                        width: 1000,
-                        child: ListView.separated(
-                          itemCount: invoices.length,
-                          separatorBuilder:
-                              (context, index) => SizedBox(height: 5),
-                          itemBuilder:
-                              (context, index) => _Item(
-                                invoice: invoices[index],
-                                onInvoiceSelected: (invoiceController) {
-                                  widget.onLoaded(invoiceController);
-                                },
-                                onDeleted: () {
-                                  setState(() {
-                                    invoices.remove(invoices[index]);
-                                  });
-                                },
-                              ),
+                          padding: EdgeInsets.symmetric(vertical: 50),
+                          height: context.height,
+                          width: 1000,
+                          child: ListView.separated(
+                            itemCount: invoices.length,
+                            separatorBuilder: (context, index) =>
+                                SizedBox(height: 5),
+                            itemBuilder: (context, index) => _Item(
+                              invoice: invoices[index],
+                              onInvoiceSelected: (invoiceController) {
+                                widget.onLoaded(invoiceController);
+                              },
+                              onSaved: (newInvoice) {
+                                setState(() {
+                                  invoices[index] = newInvoice;
+                                });
+                              },
+                              onDeleted: () {
+                                setState(() {
+                                  invoices.remove(invoices[index]);
+                                });
+                              },
+                            ),
+                          ),
                         ),
-                      ),
                 ],
               ),
             ),
@@ -138,11 +142,13 @@ class _Item extends StatelessWidget {
   final void Function(InvoiceDetailsController invoiceController)
   onInvoiceSelected;
   final VoidCallback onDeleted;
+  final void Function(Invoice newInvoice) onSaved;
 
   const _Item({
     required this.invoice,
     required this.onInvoiceSelected,
     required this.onDeleted,
+    required this.onSaved,
   });
   @override
   Widget build(BuildContext context) {
@@ -160,7 +166,10 @@ class _Item extends StatelessWidget {
               builder: (context) {
                 final invoiceController = InvoiceDetailsController(invoice);
                 onInvoiceSelected(invoiceController);
-                return InvoiceDetails(invoiceController: invoiceController);
+                return InvoiceDetails(
+                  invoiceController: invoiceController,
+                  onSaved: onSaved,
+                );
               },
             ),
           );

@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
+import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/invoice_screen/invoice_btns.dart';
 import 'package:i_gen/widgets/invoice_screen/invoice_customer_info.dart';
@@ -14,8 +15,14 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 class InvoiceDetails extends StatefulWidget {
-  const InvoiceDetails({super.key, required this.invoiceController});
+  const InvoiceDetails({
+    super.key,
+    required this.invoiceController,
+    this.onSaved,
+  });
   final InvoiceDetailsController invoiceController;
+  final void Function(Invoice newInvoice)? onSaved;
+
   @override
   State<InvoiceDetails> createState() => _InvoiceDetailsState();
 }
@@ -62,7 +69,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(
           child: ScrollConfiguration(
@@ -93,7 +100,10 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                             InvoiceCustomerInfo(widget.invoiceController),
                             SizedBox(height: 10),
 
-                            InvoiceTable(widget.invoiceController),
+                            InvoiceTable(
+                              widget.invoiceController,
+                              onSaved: widget.onSaved,
+                            ),
                             SizedBox(height: 50),
                           ],
                         ),
@@ -108,6 +118,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
         Container(
           constraints: BoxConstraints.expand(width: 200),
           alignment: Alignment.centerRight,
+          // color: Colors.red,
           child: InvoiceBtns(
             controller: widget.invoiceController,
             onExportAsImage: saveAsImage,

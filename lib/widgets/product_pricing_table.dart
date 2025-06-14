@@ -97,9 +97,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                   label: Text('Undo'),
                   icon: Icon(Icons.undo),
                   onPressed: () {
-                    stateManager.revertChanges(
-                      cells: rendererContext.row.cells.values.toList(),
-                    );
+                    stateManager.revertRowChanges(rendererContext.rowIdx);
                     stateManager.setEditing(false);
 
                     updateDirtyCount();
@@ -156,14 +154,13 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
             onPressed: () {
               showDialog(
                 context: context,
-                builder:
-                    (context) => _EditPriceCategoryDialog(
-                      name: name,
-                      currency: currency,
-                      priceCategoryId: priceCategoryId,
-                      existingCategories: pricingCategories,
-                      rendererContext: rendererContext,
-                    ),
+                builder: (context) => _EditPriceCategoryDialog(
+                  name: name,
+                  currency: currency,
+                  priceCategoryId: priceCategoryId,
+                  existingCategories: pricingCategories,
+                  rendererContext: rendererContext,
+                ),
               );
             },
             iconAlignment: IconAlignment.end,
@@ -179,8 +176,9 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
   }
 
   Future<List<TrinaRow>> fetchRows() async {
-    final productsPricing =
-        await GetIt.I.get<ProductPricingRepo>().getProductsPricing();
+    final productsPricing = await GetIt.I
+        .get<ProductPricingRepo>()
+        .getProductsPricing();
     return productsPricing.entries.map((e) {
       return TrinaRow(
         cells: {
@@ -208,10 +206,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
       onChanged: (TrinaGridOnChangedEvent event) {
         updateDirtyCount();
         dirtyRows.add(event.rowIdx);
-        print(event);
-        for (var cell in event.row.cells.values) {
-          print('${cell.value}: ${cell.isDirty}');
-        }
+
         if (event.row.cells['status']!.value == 'saved') {
           event.row.cells['status']!.value = 'edited';
         }
@@ -244,44 +239,45 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                   return value <= 0
                       ? SizedBox.shrink()
                       : TextButton.icon(
-                        label: Text(
-                          'Save All',
-                          style: textStyle.copyWith(
-                            color: context.colorScheme.primary,
+                          label: Text(
+                            'Save All',
+                            style: textStyle.copyWith(
+                              color: context.colorScheme.primary,
+                            ),
                           ),
-                        ),
-                        icon: Icon(Icons.save),
-                        onPressed: () async {
-                          stateManager.setShowLoading(true);
-                          for (final rowId in dirtyRows) {
-                            var row = stateManager.refRows[rowId];
-                            for (final cell in row.cells.values) {
-                              if (cell.isDirty) {
-                                final priceCategory = pricingCategories
-                                    .firstWhere(
-                                      (element) =>
-                                          element.name == cell.column.title,
-                                    );
-                                await GetIt.I.get<ProductPricingRepo>().save(
-                                  priceCategoryId: priceCategory.id,
-                                  productId:
-                                      products[row.cells['model']!.value]!.id,
-                                  price: cell.value,
-                                  currency: priceCategory.currency,
-                                );
+                          icon: Icon(Icons.save),
+                          onPressed: () async {
+                            stateManager.setShowLoading(true);
+                            for (final rowId in dirtyRows) {
+                              var row = stateManager.refRows[rowId];
+                              for (final cell in row.cells.values) {
+                                if (cell.isDirty) {
+                                  final priceCategory = pricingCategories
+                                      .firstWhere(
+                                        (element) =>
+                                            element.name == cell.column.title,
+                                      );
+                                  await GetIt.I.get<ProductPricingRepo>().save(
+                                    priceCategoryId: priceCategory.id,
+                                    productId:
+                                        products[row.cells['model']!.value]!.id,
+                                    price: cell.value,
+                                    currency: priceCategory.currency,
+                                  );
+                                }
+                                stateManager.commitChanges(cell: cell);
+                                stateManager
+                                        .refRows[rowId]
+                                        .cells['status']!
+                                        .value =
+                                    'saved';
                               }
-                              stateManager.commitChanges(cell: cell);
-                              stateManager
-                                  .refRows[rowId]
-                                  .cells['status']!
-                                  .value = 'saved';
                             }
-                          }
-                          stateManager.setShowLoading(false);
-                          dirtyRows.clear();
-                          updateDirtyCount();
-                        },
-                      );
+                            stateManager.setShowLoading(false);
+                            dirtyRows.clear();
+                            updateDirtyCount();
+                          },
+                        );
                 },
               ),
               Container(
@@ -296,12 +292,11 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
 
                     final res = await showDialog(
                       context: context,
-                      builder:
-                          (context) => _EditPriceCategoryDialog(
-                            name: '',
-                            currency: currency,
-                            existingCategories: pricingCategories,
-                          ),
+                      builder: (context) => _EditPriceCategoryDialog(
+                        name: '',
+                        currency: currency,
+                        existingCategories: pricingCategories,
+                      ),
                     );
                     if (res case (int id, String name, String currency)) {
                       final index = stateManager.refColumns.length;
@@ -450,15 +445,12 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
                 isDense: false,
                 style: textStyle,
 
-                items:
-                    currencies.entries
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e.key,
-                            child: Text(e.value),
-                          ),
-                        )
-                        .toList(),
+                items: currencies.entries
+                    .map(
+                      (e) =>
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   newCurrency = value ?? '';
                 },

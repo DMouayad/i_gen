@@ -13,6 +13,9 @@ class InvoiceDetailsController {
       invoiceId = invoice?.id,
       invoiceLines =
           invoice?.lines.map(InvoiceTableRow.fromInvoiceLine).toList() ?? [];
+
+  final ValueNotifier<int> textSizeNotifier = ValueNotifier(18);
+
   int? invoiceId;
   Invoice? invoice;
   final GlobalKey formKey = GlobalKey<FormState>();

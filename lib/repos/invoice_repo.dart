@@ -65,6 +65,16 @@ class InvoiceRepo {
         date: date,
         total: total,
         currency: currency,
+        lines: lines
+            .map(
+              (l) => InvoiceLine(
+                amount: l.amount,
+                price: l.unitPrice.toDouble(),
+                invoiceId: id!,
+                product: l.product,
+              ),
+            )
+            .toList(),
         discount: discount,
       );
     });
@@ -75,13 +85,14 @@ class InvoiceRepo {
 
   Future<List<Invoice>> getInvoices([OrderBy? orderBy]) async {
     final result = await db.rawQuery('''
-select invoice.*, product_id, amount,price from invoice inner join invoice_line on invoice._id = invoice_line.invoice_id
+select invoice.*, product_id, amount,price from invoice left join invoice_line on invoice._id = invoice_line.invoice_id
 ${orderBy != null ? ' ORDER BY ${orderBy.field} ${orderBy.isAscending ? " asc" : " desc"}' : ''}
 ''');
     Map<int, Invoice> invoices = {};
     for (var row in result) {
       var invoice = Invoice.fromMap(row);
       if (invoice != null) {
+        print(invoice.id);
         if (row case {
           'amount': int amount,
           'product_id': int productId,

@@ -19,6 +19,7 @@ class Invoice {
     this.lines = const [],
   });
   static Invoice? fromMap(Map<String, dynamic> map) {
+    print('${map['_id']}: $map');
     if (map case {
       '_id': int id,
       'customer': String customerName,

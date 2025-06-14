@@ -146,9 +146,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                 IconButton(
                   icon: Icon(Icons.undo),
                   onPressed: () {
-                    stateManager.revertChanges(
-                      cells: rendererContext.row.cells.values.toList(),
-                    );
+                    stateManager.revertRowChanges(rendererContext.rowIdx);
                     stateManager.setEditing(false);
 
                     updateDirtyCount();

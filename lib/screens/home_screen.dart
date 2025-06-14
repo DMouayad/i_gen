@@ -192,13 +192,12 @@ class _HomeState extends State<Home> {
                   builder: (context, _) {
                     return switch (navListener!.value) {
                       0 => Center(
-                        child: Example(),
-                        // child: ArchiveScreen(
-                        //   onLoaded:
-                        //       (invoiceController) =>
-                        //           currentInvoiceDetailsController =
-                        //               invoiceController,
-                        // ),
+                        child: ArchiveScreen(
+                          onLoaded:
+                              (invoiceController) =>
+                                  currentInvoiceDetailsController =
+                                      invoiceController,
+                        ),
                       ),
                       1 => ProductsScreen2(
                         unsavedProductCountNotifier:

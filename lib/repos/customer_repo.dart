@@ -7,11 +7,10 @@ class CustomerRepo {
   CustomerRepo(this.db);
 
   Future<List<String>> search(String query) async {
-    final res = await db.query(
-      DbConstants.tableInvoice,
-      columns: [DbConstants.columnCustomerName],
-      where: '${DbConstants.columnCustomerName} like ?',
-      whereArgs: ['%$query%'],
+    final res = await db.rawQuery(
+      'Select Distinct ${DbConstants.columnCustomerName} from ${DbConstants.tableInvoice} where ${DbConstants.columnCustomerName} like ?',
+
+      ['%$query%'],
     );
     final names = <String>[];
     for (var e in res) {
