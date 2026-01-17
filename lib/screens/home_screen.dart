@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/screens/archive_screen.dart';
-import 'package:i_gen/screens/example.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/screens/pricing_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';

@@ -54,21 +54,20 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
         },
         sort: TrinaColumnSort.descending,
         enableEditingMode: true,
-        renderer:
-            (rendererContext) => Container(
-              constraints: BoxConstraints.expand(),
-              margin: EdgeInsets.all(.1),
-              alignment: Alignment.center,
-              color: switch (rendererContext.row.cells['status']!.value) {
-                'edited' => Colors.amber[100]!,
-                'error' => context.colorScheme.errorContainer,
-                _ =>
-                  rendererContext.rowIdx % 2 == 0
-                      ? context.colorScheme.surface
-                      : Colors.white,
-              },
-              child: Text(rendererContext.cell.value, style: textStyle),
-            ),
+        renderer: (rendererContext) => Container(
+          constraints: BoxConstraints.expand(),
+          margin: EdgeInsets.all(.1),
+          alignment: Alignment.center,
+          color: switch (rendererContext.row.cells['status']!.value) {
+            'edited' => Colors.amber[100]!,
+            'error' => context.colorScheme.errorContainer,
+            _ =>
+              rendererContext.rowIdx % 2 == 0
+                  ? context.colorScheme.surface
+                  : Colors.white,
+          },
+          child: Text(rendererContext.cell.value, style: textStyle),
+        ),
         width: 50,
         cellPadding: EdgeInsets.zero,
         enableColumnDrag: false,
@@ -108,11 +107,9 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
               IconButton(
                 icon: Icon(Icons.delete),
                 onPressed: () async {
-                  final toDelete =
-                      GetIt.I.get<ProductsController>().products[rendererContext
-                          .row
-                          .cells['id']!
-                          .value];
+                  final toDelete = GetIt.I
+                      .get<ProductsController>()
+                      .products[rendererContext.row.cells['id']!.value];
                   // ONLY if the product exists in the db, delete it
                   if (toDelete != null) {
                     await GetIt.I.get<ProductsController>().deleteProduct(
@@ -146,7 +143,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                 IconButton(
                   icon: Icon(Icons.undo),
                   onPressed: () {
-                    stateManager.revertRowChanges(rendererContext.rowIdx);
+                    // stateManager.revertChanges(rendererContext.rowIdx);
                     stateManager.setEditing(false);
 
                     updateDirtyCount();
@@ -160,21 +157,20 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
       ),
     ];
 
-    rows =
-        GetIt.I
-            .get<ProductsController>()
-            .products
-            .values
-            .map(
-              (p) => TrinaRow(
-                cells: {
-                  'id': TrinaCell(value: p.model),
-                  'name': TrinaCell(value: p.name),
-                  'status': TrinaCell(value: 'saved'),
-                },
-              ),
-            )
-            .toList();
+    rows = GetIt.I
+        .get<ProductsController>()
+        .products
+        .values
+        .map(
+          (p) => TrinaRow(
+            cells: {
+              'id': TrinaCell(value: p.model),
+              'name': TrinaCell(value: p.name),
+              'status': TrinaCell(value: 'saved'),
+            },
+          ),
+        )
+        .toList();
 
     super.initState();
   }
@@ -244,22 +240,20 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
 
                   stateManager.setEditing(false);
                 },
-                createHeader:
-                    (stateManager) => TrinaTableHeader(
-                      addNewText: 'Add Product',
-                      unSavedCountText:
-                          (count) => 'You have $count un saved products',
-                      unSavedCountNotifier: widget.unsavedProductCountNotifier,
-                      stateManager: stateManager,
-                      newRow:
-                          () => TrinaRow(
-                            cells: {
-                              'id': TrinaCell(value: 'new'),
-                              'name': TrinaCell(value: 'new'),
-                              'status': TrinaCell(value: 'created'),
-                            },
-                          ),
-                    ),
+                createHeader: (stateManager) => TrinaTableHeader(
+                  addNewText: 'Add Product',
+                  unSavedCountText: (count) =>
+                      'You have $count un saved products',
+                  unSavedCountNotifier: widget.unsavedProductCountNotifier,
+                  stateManager: stateManager,
+                  newRow: () => TrinaRow(
+                    cells: {
+                      'id': TrinaCell(value: 'new'),
+                      'name': TrinaCell(value: 'new'),
+                      'status': TrinaCell(value: 'created'),
+                    },
+                  ),
+                ),
 
                 configuration: TrinaGridConfiguration(
                   enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,

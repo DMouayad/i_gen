@@ -138,7 +138,6 @@ class InvoiceTableState extends State<InvoiceTable> {
         textAlign: TrinaColumnTextAlign.center,
         titleTextAlign: TrinaColumnTextAlign.center,
         renderer: _cellRenderer,
-        enableFooterBorderVertical: false,
         editCellRenderer:
             (
               defaultEditCellWidget,
@@ -168,7 +167,6 @@ class InvoiceTableState extends State<InvoiceTable> {
         minWidth: 340,
         renderer: _cellRenderer,
         titleTextAlign: TrinaColumnTextAlign.center,
-        enableFooterBorderVertical: false,
         footerRenderer: (_) {
           return Container(
             alignment: Alignment.centerLeft,
@@ -217,7 +215,6 @@ class InvoiceTableState extends State<InvoiceTable> {
         title: 'QTY',
         field: 'amount',
         minWidth: 70,
-        enableFooterBorderVertical: false,
         type: TrinaColumnType.number(negative: false, allowFirstDot: false),
       ),
       TrinaColumn(
@@ -225,7 +222,6 @@ class InvoiceTableState extends State<InvoiceTable> {
         enableAutoEditing: true,
         enableContextMenu: false,
         enableDropToResize: false,
-        enableFooterBorderVertical: false,
         renderer: (rendererContext) {
           if (selectedPriceCategory.name == null) {
             return _cellRenderer(rendererContext);
@@ -322,7 +318,6 @@ class InvoiceTableState extends State<InvoiceTable> {
         field: 'line_total',
         minWidth: 200,
         enableAutoEditing: false,
-        enableFooterBorderVertical: false,
         type: TrinaColumnType.number(
           negative: false,
           allowFirstDot: false,
@@ -347,7 +342,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              getNumberFormat().format(num.parse(sumValue)),
+                              sumValue,
                               style: textStyle.copyWith(
                                 fontSize: textStyle.fontSize! + 1,
                               ),
@@ -392,7 +387,6 @@ class InvoiceTableState extends State<InvoiceTable> {
         enableDropToResize: false,
         enableContextMenu: false,
         frozen: TrinaColumnFrozen.end,
-        enableFooterBorderVertical: false,
         footerRenderer: (context) {
           return IconButton.filled(
             style: ButtonStyle(

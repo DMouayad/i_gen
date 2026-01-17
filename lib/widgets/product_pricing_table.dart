@@ -97,7 +97,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                   label: Text('Undo'),
                   icon: Icon(Icons.undo),
                   onPressed: () {
-                    stateManager.revertRowChanges(rendererContext.rowIdx);
+                    // stateManager.revertRowChanges(rendererContext.rowIdx);
                     stateManager.setEditing(false);
 
                     updateDirtyCount();
@@ -437,7 +437,7 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
               ),
               spacer,
               DropdownButtonFormField<String>(
-                value: widget.currency,
+                initialValue: widget.currency,
                 decoration: InputDecoration(
                   labelText: 'Currency',
                   hintText: 'Enter currency',
