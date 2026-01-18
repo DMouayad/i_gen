@@ -151,14 +151,11 @@ class ProductListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLargeScreen = context.width > 600;
-    final titleStyle = context.textTheme.titleMedium?.copyWith(
-      fontSize: isLargeScreen ? 24 : 18,
-    );
+    final titleStyle = context.textTheme.titleLarge;
 
     return Card(
       elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
       shape: RoundedRectangleBorder(
         side: BorderSide(color: Colors.grey.shade300, width: 0.5),
         borderRadius: BorderRadius.circular(8),
@@ -223,6 +220,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final textStyle = context.textTheme.titleLarge;
     return AlertDialog(
       title: Text(widget.product == null ? 'Add Product' : 'Edit Product'),
       content: Form(
@@ -231,6 +229,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextFormField(
+              style: textStyle,
               controller: _modelController,
               decoration: InputDecoration(labelText: 'Model'),
               validator: (value) {
@@ -242,6 +241,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              style: textStyle,
               controller: _nameController,
               decoration: InputDecoration(labelText: 'Name'),
               validator: (value) {
