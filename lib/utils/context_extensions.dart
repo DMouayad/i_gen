@@ -5,6 +5,7 @@ extension ScreenExtensions on BuildContext {
   double get width => MediaQuery.of(this).size.width;
   double get height => MediaQuery.of(this).size.height;
   bool get showNavigationRail => width > 600 && height > 600;
+  bool get isMobile => width < 600;
 }
 
 extension ThemeExtensions on BuildContext {
@@ -17,6 +18,7 @@ extension TextStylesExtensions on BuildContext {
     fontWeight: FontWeight.w600,
     color: Colors.black,
   );
+  ThemeData get theme => Theme.of(this);
   TextTheme get textTheme => TextTheme.of(this);
 }
 

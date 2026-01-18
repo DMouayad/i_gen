@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/screens/archive_screen.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
-import 'package:i_gen/screens/pricing_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
+import 'package:i_gen/widgets/product_pricing_table.dart';
 
 const _productsPageIndex = 1;
 const _invoicePageIndex = 2;
@@ -94,40 +95,55 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
+  void _onCreateNew() {
+    currentInvoiceDetailsController = InvoiceDetailsController(null);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            InvoiceDetails(invoiceController: currentInvoiceDetailsController!),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     navListener ??= NavListener(
       navigationConfirmedStreamController.stream,
-      onChange:
-          (oldIndex, newIndex) => onIndexChange(oldIndex, newIndex, context),
+      onChange: (oldIndex, newIndex) =>
+          onIndexChange(oldIndex, newIndex, context),
     );
     return Scaffold(
-      bottomNavigationBar:
-          context.showNavigationRail
-              ? null
-              : ListenableBuilder(
-                listenable: navListener!,
-                builder: (context, child) {
-                  return BottomNavigationBar(
-                    currentIndex: navListener!.value,
-                    items: [
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.history),
-                        label: 'History',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.list_alt),
-                        label: 'Products',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.add),
-                        label: 'New',
-                      ),
-                    ],
-                    onTap: navListener!.updateIndex,
-                  );
-                },
-              ),
+      floatingActionButton: context.showNavigationRail
+          ? null
+          : FloatingActionButton(
+              onPressed: _onCreateNew,
+              child: Icon(Icons.add),
+            ),
+      bottomNavigationBar: context.showNavigationRail
+          ? null
+          : ListenableBuilder(
+              listenable: navListener!,
+              builder: (context, child) {
+                return BottomNavigationBar(
+                  currentIndex: navListener!.value,
+                  items: [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.history),
+                      label: 'History',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.list_alt),
+                      label: 'Products',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.currency_exchange),
+                      label: 'Pricing',
+                    ),
+                  ],
+                  onTap: navListener!.updateIndex,
+                );
+              },
+            ),
       body: SafeArea(
         child: Row(
           children: [
@@ -145,11 +161,26 @@ class _HomeState extends State<Home> {
                     extended: true,
                     onDestinationSelected: navListener!.updateIndex,
                     useIndicator: true,
+
+                    trailing: Padding(
+                      padding: const EdgeInsets.only(top: 24.0),
+                      child: FilledButton.icon(
+                        style: ButtonStyle(
+                          minimumSize: WidgetStatePropertyAll(Size(200, 55)),
+                          textStyle: WidgetStatePropertyAll(
+                            TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        onPressed: _onCreateNew,
+                        icon: Icon(Icons.add),
+                        label: Text('Add'),
+                      ),
+                    ),
                     backgroundColor: context.colorScheme.surface,
                     leading: SizedBox(
                       width: 210,
                       child: Text(
-                        'InvoGen',
+                        'IGen',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -167,11 +198,6 @@ class _HomeState extends State<Home> {
                         icon: Icon(Icons.list_alt_outlined),
                         selectedIcon: Icon(Icons.list_alt),
                         label: Text('Products'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.new_label),
-                        selectedIcon: Icon(Icons.new_label),
-                        label: Text('New Invoice'),
                       ),
                       NavigationRailDestination(
                         icon: Icon(Icons.currency_exchange),
@@ -192,27 +218,21 @@ class _HomeState extends State<Home> {
                     return switch (navListener!.value) {
                       0 => Center(
                         child: ArchiveScreen(
-                          onLoaded:
-                              (invoiceController) =>
-                                  currentInvoiceDetailsController =
-                                      invoiceController,
+                          onLoaded: (invoiceController) =>
+                              currentInvoiceDetailsController =
+                                  invoiceController,
                         ),
                       ),
                       1 => ProductsScreen2(
                         unsavedProductCountNotifier:
                             unsavedProductCountNotifier,
                       ),
-                      2 => () {
-                        currentInvoiceDetailsController =
-                            InvoiceDetailsController(null);
-                        return InvoiceDetails(
-                          invoiceController: currentInvoiceDetailsController!,
-                        );
-                      }(),
-
-                      3 => PricingScreen(
-                        unsavedPricingCategoryCountNotifier,
-                        unsavedProductPricingCountNotifier,
+                      2 => SizedBox(
+                        width: 1024,
+                        child: ProductPricingTable(
+                          unsavedProductPricingCountNotifier,
+                          unsavedPricingCategoryCountNotifier,
+                        ),
                       ),
                       _ => const Center(child: Text('404')),
                     };
