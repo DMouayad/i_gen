@@ -70,6 +70,17 @@ class _HomeState extends State<Home> {
           }
         });
         return;
+      } else if (unsavedProductPricingCountNotifier.value > 0) {
+        _showNavConfirmationDialog(
+          context,
+          title: 'Unsaved Product Pricing',
+          content: 'You have unsaved product pricing, do you want to continue?',
+        ).then((confirmed) {
+          if (confirmed ?? false) {
+            unsavedProductPricingCountNotifier.value = 0;
+          }
+        });
+        return;
       }
     }
     navigationConfirmedStreamController.add(true);
