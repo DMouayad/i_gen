@@ -85,7 +85,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
         surfaceTintColor: context.colorScheme.surface,
         actionsPadding: EdgeInsets.symmetric(horizontal: 4),
         actions: [
-          FilledButton.tonalIcon(
+          TextButton.icon(
             style: ButtonStyle(
               minimumSize: context.isMobile
                   ? null
@@ -151,14 +151,16 @@ class ProductListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = context.textTheme.titleLarge;
+    final titleStyle = context.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.bold,
+    );
 
     return Card(
-      elevation: 1,
-      margin: const EdgeInsets.symmetric(vertical: 3.0),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 2.0),
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: Colors.grey.shade300, width: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.shade400, width: 0.5),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),

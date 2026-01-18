@@ -75,11 +75,13 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
     );
     columns.add(
       TrinaColumn(
-        title: 'Actions',
+        title: '',
         field: 'status',
         width: 70,
         enableEditingMode: false,
         frozen: TrinaColumnFrozen.end,
+        enableContextMenu: false,
+        enableDropToResize: false,
         enableColumnDrag: false,
         type: TrinaColumnType.select(<String>[
           'saved',
@@ -93,8 +95,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
             alignment: MainAxisAlignment.spaceAround,
             children: [
               if (rendererContext.cell.value == 'edited') ...[
-                TextButton.icon(
-                  label: Text('Undo'),
+                IconButton(
                   icon: Icon(Icons.undo),
                   onPressed: () {
                     final cells = rendererContext.row.cells.values;
@@ -204,8 +205,10 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: context.isMobile ? context.width : 920,
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: context.isMobile ? context.width : 920,
+      ),
       child: TrinaGrid(
         columns: columns,
         rows: [],
