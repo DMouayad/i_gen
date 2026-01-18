@@ -114,24 +114,25 @@ class _HomeState extends State<Home> {
       onChange: (oldIndex, newIndex) =>
           onIndexChange(oldIndex, newIndex, context),
     );
-    return Scaffold(
-      floatingActionButton: context.showNavigationRail
-          ? null
-          : FloatingActionButton(
-              onPressed: _onCreateNew,
-              child: Icon(Icons.add),
-            ),
-      bottomNavigationBar: context.showNavigationRail
-          ? null
-          : ListenableBuilder(
-              listenable: navListener!,
-              builder: (context, child) {
-                return BottomNavigationBar(
+    return ListenableBuilder(
+      listenable: navListener!,
+
+      builder: (context, _) {
+        return Scaffold(
+          floatingActionButton: !context.isMobile || navListener!.value != 0
+              ? null
+              : FloatingActionButton(
+                  onPressed: _onCreateNew,
+                  child: const Icon(Icons.add),
+                ),
+          bottomNavigationBar: context.showNavigationRail
+              ? null
+              : BottomNavigationBar(
                   currentIndex: navListener!.value,
-                  items: [
+                  items: const [
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.history),
-                      label: 'History',
+                      icon: Icon(Icons.inventory),
+                      label: 'Invoices',
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.list_alt),
@@ -143,17 +144,12 @@ class _HomeState extends State<Home> {
                     ),
                   ],
                   onTap: navListener!.updateIndex,
-                );
-              },
-            ),
-      body: SafeArea(
-        child: Row(
-          children: [
-            if (context.showNavigationRail)
-              ListenableBuilder(
-                listenable: navListener!,
-                builder: (context, child) {
-                  return NavigationRail(
+                ),
+          body: SafeArea(
+            child: Row(
+              children: [
+                if (context.showNavigationRail)
+                  NavigationRail(
                     selectedIndex: navListener!.value,
                     unselectedLabelTextStyle: textStyle,
                     selectedLabelTextStyle: textStyle.copyWith(
@@ -174,12 +170,12 @@ class _HomeState extends State<Home> {
                           ),
                         ),
                         onPressed: _onCreateNew,
-                        icon: Icon(Icons.add),
-                        label: Text('Add'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add'),
                       ),
                     ),
                     backgroundColor: context.colorScheme.surface,
-                    leading: SizedBox(
+                    leading: const SizedBox(
                       width: 210,
                       child: Text(
                         'IGen',
@@ -190,11 +186,10 @@ class _HomeState extends State<Home> {
                         textAlign: TextAlign.start,
                       ),
                     ),
-
                     destinations: const <NavigationRailDestination>[
                       NavigationRailDestination(
-                        icon: Icon(Icons.history),
-                        label: Text('History'),
+                        icon: Icon(Icons.inventory),
+                        label: Text('Invoices'),
                       ),
                       NavigationRailDestination(
                         icon: Icon(Icons.list_alt_outlined),
@@ -207,19 +202,14 @@ class _HomeState extends State<Home> {
                         label: Text('Pricing'),
                       ),
                     ],
-                  );
-                },
-              ),
-            Flexible(
-              child: Container(
-                alignment: Alignment.center,
-                padding: context.isMobile
-                    ? EdgeInsets.zero
-                    : EdgeInsets.symmetric(vertical: 50, horizontal: 24),
-                child: ListenableBuilder(
-                  listenable: navListener!,
-                  builder: (context, _) {
-                    return switch (navListener!.value) {
+                  ),
+                Flexible(
+                  child: Container(
+                    alignment: Alignment.center,
+                    padding: context.isMobile
+                        ? EdgeInsets.zero
+                        : EdgeInsets.symmetric(vertical: 50, horizontal: 24),
+                    child: switch (navListener!.value) {
                       0 => Center(
                         child: ArchiveScreen(
                           onLoaded: (invoiceController) =>
@@ -237,22 +227,19 @@ class _HomeState extends State<Home> {
                                 unsavedProductCountNotifier:
                                     unsavedProductCountNotifier,
                               ),
-                      2 => SizedBox(
-                        width: 1024,
-                        child: ProductPricingTable(
-                          unsavedProductPricingCountNotifier,
-                          unsavedPricingCategoryCountNotifier,
-                        ),
+                      2 => ProductPricingTable(
+                        unsavedProductPricingCountNotifier,
+                        unsavedPricingCategoryCountNotifier,
                       ),
                       _ => const Center(child: Text('404')),
-                    };
-                  },
+                    },
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
