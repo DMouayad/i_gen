@@ -33,6 +33,14 @@ class MainApp extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('en'),
       title: 'I-Gen',
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(1.0)),
+          child: child!,
+        );
+      },
       theme: ThemeData.light().copyWith(
         visualDensity: VisualDensity.adaptivePlatformDensity,
         scaffoldBackgroundColor: Color(0xFFF8F8F8),
