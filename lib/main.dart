@@ -46,7 +46,7 @@ class MainApp extends StatelessWidget {
         scaffoldBackgroundColor: Color(0xFFF8F8F8),
         colorScheme: ColorScheme.fromSeed(
           dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
-          seedColor: Colors.lightBlue,
+          seedColor: const Color.fromARGB(255, 16, 94, 197),
         ),
         textTheme: Typography.material2021().black.apply(
           fontFamily: 'Noto Naskh Arabic',
