@@ -61,10 +61,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
           color: switch (rendererContext.row.cells['status']!.value) {
             'edited' => Colors.amber[100]!,
             'error' => context.colorScheme.errorContainer,
-            _ =>
-              rendererContext.rowIdx % 2 == 0
-                  ? context.colorScheme.surface
-                  : Colors.white,
+            _ => null,
           },
           child: Text(rendererContext.cell.value, style: textStyle),
         ),
@@ -79,6 +76,8 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
         title: 'Name',
         field: 'name',
         type: TrinaColumnType.text(),
+        renderer: (rendererContext) =>
+            Text(rendererContext.cell.value, style: textStyle),
         minWidth: 300,
         enableColumnDrag: false,
         enableContextMenu: false,
@@ -143,9 +142,11 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                 IconButton(
                   icon: Icon(Icons.undo),
                   onPressed: () {
-                    // stateManager.revertChanges(rendererContext.rowIdx);
+                    for (final cell in rendererContext.row.cells.values) {
+                      stateManager.revertChanges(cell: cell);
+                    }
                     stateManager.setEditing(false);
-
+                    stateManager.notifyListenersOnPostFrame();
                     updateDirtyCount();
                     rendererContext.cell.value = 'saved';
                   },
@@ -269,7 +270,10 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                     evenRowColor: Colors.white,
                     oddRowColor: context.colorScheme.surface,
                   ),
-                  scrollbar: TrinaGridScrollbarConfig(showHorizontal: false),
+                  scrollbar: TrinaGridScrollbarConfig(
+                    showHorizontal: false,
+                    showVertical: false,
+                  ),
                   columnSize: TrinaGridColumnSizeConfig(
                     autoSizeMode: TrinaAutoSizeMode.scale,
                   ),
