@@ -146,9 +146,9 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                       stateManager.revertChanges(cell: cell);
                     }
                     stateManager.setEditing(false);
-                    stateManager.notifyListenersOnPostFrame();
                     updateDirtyCount();
                     rendererContext.cell.value = 'saved';
+                    stateManager.notifyListenersOnPostFrame();
                   },
                 ),
               ],
@@ -201,96 +201,83 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 1024,
-      child: Column(
-        children: [
-          Flexible(
-            child: Container(
-              width: 1024,
-              height: context.height,
-              padding: const EdgeInsets.symmetric(vertical: 40.0),
-              child: TrinaGrid(
-                columns: columns,
-                rows: rows,
-                onChanged: (TrinaGridOnChangedEvent event) {
-                  updateDirtyCount();
+      height: context.height,
+      child: TrinaGrid(
+        columns: columns,
+        rows: rows,
+        onChanged: (TrinaGridOnChangedEvent event) {
+          updateDirtyCount();
 
-                  if (event.row.cells['status']!.value == 'saved') {
-                    event.row.cells['status']!.value = 'edited';
-                    stateManager.notifyListeners();
-                  }
-                },
+          if (event.row.cells['status']!.value == 'saved') {
+            event.row.cells['status']!.value = 'edited';
+            stateManager.notifyListeners();
+          }
+        },
 
-                onValidationFailed: (event) {
-                  stateManager.gridFocusNode.unfocus();
-                  stateManager.setSelecting(false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        event.errorMessage,
-                        style: textStyle.copyWith(
-                          color: context.colorScheme.onErrorContainer,
-                        ),
-                      ),
-
-                      behavior: SnackBarBehavior.floating,
-                      width: min(700, context.width * .8),
-                      backgroundColor: context.colorScheme.errorContainer,
-                      duration: Duration(seconds: 10),
-                    ),
-                  );
-
-                  stateManager.setEditing(false);
-                },
-                createHeader: (stateManager) => TrinaTableHeader(
-                  addNewText: 'Add Product',
-                  unSavedCountText: (count) =>
-                      'You have $count un saved products',
-                  unSavedCountNotifier: widget.unsavedProductCountNotifier,
-                  stateManager: stateManager,
-                  newRow: () => TrinaRow(
-                    cells: {
-                      'id': TrinaCell(value: 'new'),
-                      'name': TrinaCell(value: 'new'),
-                      'status': TrinaCell(value: 'created'),
-                    },
-                  ),
+        onValidationFailed: (event) {
+          stateManager.gridFocusNode.unfocus();
+          stateManager.setSelecting(false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                event.errorMessage,
+                style: textStyle.copyWith(
+                  color: context.colorScheme.onErrorContainer,
                 ),
-
-                configuration: TrinaGridConfiguration(
-                  enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
-                  style: TrinaGridStyleConfig(
-                    cellDirtyColor: Colors.amber[100]!,
-                    borderColor: context.colorScheme.surfaceDim,
-                    gridBorderColor: context.colorScheme.surfaceDim,
-                    gridBorderRadius: BorderRadius.circular(6),
-                    cellTextStyle: textStyle,
-                    columnTextStyle: textStyle.copyWith(
-                      color: context.colorScheme.primary,
-                    ),
-                    evenRowColor: Colors.white,
-                    oddRowColor: context.colorScheme.surface,
-                  ),
-                  scrollbar: TrinaGridScrollbarConfig(
-                    showHorizontal: false,
-                    showVertical: false,
-                  ),
-                  columnSize: TrinaGridColumnSizeConfig(
-                    autoSizeMode: TrinaAutoSizeMode.scale,
-                  ),
-                ),
-
-                onLoaded: (TrinaGridOnLoadedEvent event) {
-                  event.stateManager.setSelectingMode(
-                    TrinaGridSelectingMode.cell,
-                  );
-                  stateManager = event.stateManager;
-                  stateManager.setChangeTracking(true);
-                  stateManager.setAutoEditing(true);
-                },
               ),
+
+              behavior: SnackBarBehavior.floating,
+              width: min(700, context.width * .8),
+              backgroundColor: context.colorScheme.errorContainer,
+              duration: Duration(seconds: 10),
             ),
+          );
+
+          stateManager.setEditing(false);
+        },
+        createHeader: (stateManager) => TrinaTableHeader(
+          addNewText: 'Add Product',
+          unSavedCountText: (count) => 'You have $count un saved products',
+          unSavedCountNotifier: widget.unsavedProductCountNotifier,
+          stateManager: stateManager,
+          newRow: () => TrinaRow(
+            cells: {
+              'id': TrinaCell(value: 'new'),
+              'name': TrinaCell(value: 'new'),
+              'status': TrinaCell(value: 'created'),
+            },
           ),
-        ],
+        ),
+
+        configuration: TrinaGridConfiguration(
+          enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
+          style: TrinaGridStyleConfig(
+            cellDirtyColor: Colors.amber[100]!,
+            borderColor: context.colorScheme.surfaceDim,
+            gridBorderColor: context.colorScheme.surfaceDim,
+            gridBorderRadius: BorderRadius.circular(6),
+            cellTextStyle: textStyle,
+            columnTextStyle: textStyle.copyWith(
+              color: context.colorScheme.primary,
+            ),
+            evenRowColor: Colors.white,
+            oddRowColor: context.colorScheme.surface,
+          ),
+          scrollbar: TrinaGridScrollbarConfig(
+            showHorizontal: false,
+            showVertical: false,
+          ),
+          columnSize: TrinaGridColumnSizeConfig(
+            autoSizeMode: TrinaAutoSizeMode.scale,
+          ),
+        ),
+
+        onLoaded: (TrinaGridOnLoadedEvent event) {
+          event.stateManager.setSelectingMode(TrinaGridSelectingMode.cell);
+          stateManager = event.stateManager;
+          stateManager.setChangeTracking(true);
+          stateManager.setAutoEditing(true);
+        },
       ),
     );
   }

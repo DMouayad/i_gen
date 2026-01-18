@@ -6,6 +6,7 @@ import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/screens/archive_screen.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';
+import 'package:i_gen/screens/products_screen_mobile.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/product_pricing_table.dart';
@@ -212,7 +213,9 @@ class _HomeState extends State<Home> {
             Flexible(
               child: Container(
                 alignment: Alignment.center,
-                padding: EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                padding: context.isMobile
+                    ? EdgeInsets.zero
+                    : EdgeInsets.symmetric(vertical: 50, horizontal: 24),
                 child: ListenableBuilder(
                   listenable: navListener!,
                   builder: (context, _) {
@@ -224,10 +227,16 @@ class _HomeState extends State<Home> {
                                   invoiceController,
                         ),
                       ),
-                      1 => ProductsScreen2(
-                        unsavedProductCountNotifier:
-                            unsavedProductCountNotifier,
-                      ),
+                      1 =>
+                        context.isMobile
+                            ? ProductsScreeMobile(
+                                unsavedProductCountNotifier:
+                                    unsavedProductCountNotifier,
+                              )
+                            : ProductsScreen2(
+                                unsavedProductCountNotifier:
+                                    unsavedProductCountNotifier,
+                              ),
                       2 => SizedBox(
                         width: 1024,
                         child: ProductPricingTable(
