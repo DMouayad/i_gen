@@ -91,7 +91,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
                   ? null
                   : WidgetStatePropertyAll(Size(200, 55)),
             ),
-            label: Text('ADD', style: textStyle),
+            label: Text('New Product', style: textStyle),
             icon: Icon(Icons.add),
             onPressed: _showEditDialog,
           ),
@@ -117,7 +117,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
               ),
               Expanded(
                 child: ListView.builder(
-                  padding: EdgeInsets.only(bottom: 80),
+                  padding: EdgeInsets.only(bottom: 80, left: 8, right: 8),
                   itemCount: _filteredProducts.length,
                   itemBuilder: (context, index) {
                     final product = _filteredProducts[index];
@@ -155,7 +155,7 @@ class ProductListItem extends StatelessWidget {
 
     return Card(
       elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+      margin: const EdgeInsets.symmetric(vertical: 3.0),
       shape: RoundedRectangleBorder(
         side: BorderSide(color: Colors.grey.shade300, width: 0.5),
         borderRadius: BorderRadius.circular(8),
