@@ -31,16 +31,15 @@ class InvoiceCustomerInfo extends StatelessWidget {
             width: double.infinity,
             child: TypeAheadField<String>(
               controller: controller.customerNameController,
-              itemBuilder:
-                  (context, value) => ListTile(
-                    title: Text(
-                      value,
-                      style: context.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    tileColor: context.colorScheme.surface,
+              itemBuilder: (context, value) => ListTile(
+                title: Text(
+                  value,
+                  style: context.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+                tileColor: context.colorScheme.surface,
+              ),
               onSelected: (value) {
                 controller.customerName = value;
               },
@@ -69,8 +68,8 @@ class InvoiceCustomerInfo extends StatelessWidget {
               hideOnSelect: true,
               hideOnEmpty: true,
 
-              suggestionsCallback:
-                  (query) => GetIt.I.get<CustomerRepo>().search(query),
+              suggestionsCallback: (query) =>
+                  GetIt.I.get<CustomerRepo>().search(query),
             ),
           ),
         ],

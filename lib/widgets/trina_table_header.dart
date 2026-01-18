@@ -29,27 +29,27 @@ class TrinaTableHeader extends StatelessWidget {
             builder: (context, count, child) {
               return count > 0
                   ? Text.rich(
-                    TextSpan(
-                      children: [
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4.0,
-                            ),
-                            child: Icon(
-                              Icons.warning_amber,
-                              color: Colors.amber,
+                      TextSpan(
+                        children: [
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4.0,
+                              ),
+                              child: Icon(
+                                Icons.warning_amber,
+                                color: Colors.amber,
+                              ),
                             ),
                           ),
-                        ),
-                        TextSpan(
-                          text: unSavedCountText(count),
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  )
+                          TextSpan(
+                            text: unSavedCountText(count),
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    )
                   : SizedBox.shrink();
             },
           ),

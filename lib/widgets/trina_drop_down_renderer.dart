@@ -35,15 +35,14 @@ Widget trinaDropDownRenderer(
               });
               onChanged(newValue);
             },
-            items:
-                (cell.column.type as TrinaColumnTypeSelect).items
-                    .map<DropdownMenuItem<String>>((dynamic value) {
-                      return DropdownMenuItem<String>(
-                        value: value as String,
-                        child: Text(value),
-                      );
-                    })
-                    .toList(),
+            items: (cell.column.type as TrinaColumnTypeSelect).items
+                .map<DropdownMenuItem<String>>((dynamic value) {
+                  return DropdownMenuItem<String>(
+                    value: value as String,
+                    child: Text(value),
+                  );
+                })
+                .toList(),
           ),
         );
       },
