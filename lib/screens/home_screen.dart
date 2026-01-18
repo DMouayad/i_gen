@@ -11,8 +11,7 @@ import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/product_pricing_table.dart';
 
 const _productsPageIndex = 1;
-const _invoicePageIndex = 2;
-const _pricingPageIndex = 3;
+const _pricingPageIndex = 2;
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -38,22 +37,24 @@ class _HomeState extends State<Home> {
     int newIndex,
     BuildContext context,
   ) async {
-    if (oldIndex == _invoicePageIndex) {
-      if (currentInvoiceDetailsController?.hasUnsavedChanges == true) {
-        _showNavConfirmationDialog(
-          context,
-          title: 'Invoice was not saved',
-          content: 'Your invoice has unsaved changes, do you want to continue?',
-        );
-        return;
-      }
+    if (currentInvoiceDetailsController?.hasUnsavedChanges == true) {
+      _showNavConfirmationDialog(
+        context,
+        title: 'Invoice was not saved',
+        content: 'Your invoice has unsaved changes, do you want to continue?',
+      );
+      return;
     } else if (oldIndex == _productsPageIndex) {
       if (unsavedProductCountNotifier.value > 0) {
         _showNavConfirmationDialog(
           context,
           title: 'Unsaved Products',
           content: 'You have unsaved products, do you want to continue?',
-        );
+        ).then((confirmed) {
+          if (confirmed ?? false) {
+            unsavedProductCountNotifier.value = 0;
+          }
+        });
         return;
       }
     } else if (oldIndex == _pricingPageIndex) {
@@ -66,17 +67,6 @@ class _HomeState extends State<Home> {
         ).then((confirmed) {
           if (confirmed ?? false) {
             unsavedPricingCategoryCountNotifier.value = 0;
-          }
-        });
-        return;
-      } else if (unsavedProductPricingCountNotifier.value > 0) {
-        _showNavConfirmationDialog(
-          context,
-          title: 'Unsaved Product Pricing',
-          content: 'You have unsaved product pricing, do you want to continue?',
-        ).then((confirmed) {
-          if (confirmed ?? false) {
-            unsavedProductPricingCountNotifier.value = 0;
           }
         });
         return;
