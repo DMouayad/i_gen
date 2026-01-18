@@ -40,17 +40,17 @@ class DbProvider {
   static Future<Database> open(String path) async {
     return await openDatabase(
       path,
-      version: 2,
+      version: 1,
       onCreate: (Database db, int version) async {
         await db.execute('''
-create table ${DbConstants.tableProduct} ( 
-  ${DbConstants.columnId} integer primary key autoincrement, 
+create table ${DbConstants.tableProduct} (
+  ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnProductModel} text not null unique,
   ${DbConstants.columnProductName} text not null)
 ''');
         await db.execute('''
-create table ${DbConstants.tableInvoice} ( 
-  ${DbConstants.columnId} integer primary key autoincrement, 
+create table ${DbConstants.tableInvoice} (
+  ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnInvoiceTotal} REAL not null,
   ${DbConstants.columnCustomerName} text not null,
   ${DbConstants.columnInvoiceDate} text not null,
@@ -62,8 +62,8 @@ create table ${DbConstants.tableInvoice} (
 create INDEX "customer_name" on ${DbConstants.tableInvoice} ( ${DbConstants.columnCustomerName} )
  ''');
         await db.execute('''
-create table ${DbConstants.tableInvoiceLine} ( 
-  ${DbConstants.columnId} integer primary key autoincrement, 
+create table ${DbConstants.tableInvoiceLine} (
+  ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnInvoiceLineInvoiceId} integer not null,
   ${DbConstants.columnInvoiceLineProductId} integer not null,
   ${DbConstants.columnInvoiceLineAmount} integer not null,
@@ -71,7 +71,7 @@ create table ${DbConstants.tableInvoiceLine} (
   foreign key(${DbConstants.columnInvoiceLineInvoiceId}) references ${DbConstants.tableInvoice}(${DbConstants.columnId}),
   foreign key(${DbConstants.columnInvoiceLineProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId})
   unique(${DbConstants.columnInvoiceLineInvoiceId}, ${DbConstants.columnInvoiceLineProductId}) ON CONFLICT REPLACE
-  
+
   )
 ''');
 
@@ -85,8 +85,8 @@ create table ${DbConstants.tableInvoiceLines} (
  ''');
 
         await db.execute('''
-create table ${DbConstants.tablePrices} ( 
-  ${DbConstants.columnId} integer primary key autoincrement, 
+create table ${DbConstants.tablePrices} (
+  ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnPricesProductId} integer not null,
   ${DbConstants.columnPricesPrice} REAL not null,
   ${DbConstants.columnPricesPriceCategoryId} integer not null,
@@ -96,8 +96,8 @@ create table ${DbConstants.tablePrices} (
   )
 ''');
         await db.execute('''
-create table ${DbConstants.tablePriceCategory} ( 
-  ${DbConstants.columnId} integer primary key autoincrement, 
+create table ${DbConstants.tablePriceCategory} (
+  ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnPriceCategoryName} text not null unique,
   ${DbConstants.columnPriceCategoryCurrency} text not null
   )
@@ -113,7 +113,7 @@ class DbSeeder {
         .rawQuery('''select count (*) from ${DbConstants.tableProduct}''')
         .then((value) => value.first.values.first);
     if (storedProductsCount == 0) {
-      await db.rawInsert(''' 
+      await db.rawInsert('''
 INSERT INTO "product" VALUES (1,'A1','مشد صدر');
 INSERT INTO "product" VALUES (2,'A1+','مشد صدر عريض');
 INSERT INTO "product" VALUES (3,'B1','مشد حزام بطن');

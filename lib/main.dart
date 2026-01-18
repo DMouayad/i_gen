@@ -7,11 +7,12 @@ import 'package:i_gen/screens/home_screen.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isWindows || Platform.isLinux) {
     // Initialize FFI
     sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
   }
-  databaseFactory = databaseFactoryFfi;
 
   // register deps
   await injectDependencies();
@@ -51,7 +52,7 @@ class MainApp extends StatelessWidget {
           fontFamily: 'Noto Naskh Arabic',
         ),
       ),
-      home: Home(),
+      home: const Home(),
     );
   }
 }
