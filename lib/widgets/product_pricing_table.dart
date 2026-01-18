@@ -97,11 +97,15 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                   label: Text('Undo'),
                   icon: Icon(Icons.undo),
                   onPressed: () {
-                    // stateManager.revertRowChanges(rendererContext.rowIdx);
+                    final cells = rendererContext.row.cells.values;
+                    for (final cell in cells) {
+                      stateManager.revertChanges(cell: cell);
+                    }
                     stateManager.setEditing(false);
 
                     updateDirtyCount();
                     rendererContext.cell.value = 'saved';
+                    stateManager.notifyListenersOnPostFrame();
                   },
                 ),
               ],
