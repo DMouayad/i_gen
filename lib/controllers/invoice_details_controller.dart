@@ -14,7 +14,7 @@ class InvoiceDetailsController {
       invoiceLines =
           invoice?.lines.map(InvoiceTableRow.fromInvoiceLine).toList() ?? [];
 
-  final ValueNotifier<int> textSizeNotifier = ValueNotifier(18);
+  final ValueNotifier<int> textSizeNotifier = ValueNotifier(19);
 
   int? invoiceId;
   Invoice? invoice;
