@@ -102,35 +102,41 @@ class DbSeeder {
   static Future<void> seedProducts(Database db) async {
     final storedProductsCount = await db
         .rawQuery('''select count (*) from ${DbConstants.tableProduct}''')
-        .then((value) => value.first.values.first);
+        .then((value) => value.first.values.first as int);
     if (storedProductsCount == 0) {
-      await db.rawInsert('''
-INSERT INTO "product" VALUES (1,'A1','مشد صدر');
-INSERT INTO "product" VALUES (2,'A1+','مشد صدر عريض');
-INSERT INTO "product" VALUES (3,'B1','مشد حزام بطن');
-INSERT INTO "product" VALUES (4,'D1','سليب بطن');
-INSERT INTO "product" VALUES (5,'D2','سليب بطن ظهر عالي');
-INSERT INTO "product" VALUES (6,'C1','شورت فوق الركبة');
-INSERT INTO "product" VALUES (8,'C2','شورت تحت الركبة');
-INSERT INTO "product" VALUES (9,'A2','مشد بودي صدر مع بطن');
-INSERT INTO "product" VALUES (10,'A3','مشد بودي مع أكمام');
-INSERT INTO "product" VALUES (11,'H1','مشد ذراعين');
-INSERT INTO "product" VALUES (12,'H2','مشد ذراعين عريض');
-INSERT INTO "product" VALUES (13,'K1','شورت فوق الركبة مع خلفية تول');
-INSERT INTO "product" VALUES (14,'K2','شورت تحت الركبة مع خلفية تول');
-INSERT INTO "product" VALUES (15,'K3','أفارول فوق الركبة مع خلفية تول');
-INSERT INTO "product" VALUES (16,'K4','أفارول للكاحل مع خلفية تول');
-INSERT INTO "product" VALUES (17,'K5','أفارول كامل مع يدين مع خلفية تول');
-INSERT INTO "product" VALUES (18,'E1','مشد تثدي رجالي');
-INSERT INTO "product" VALUES (19,'E2','كنزة حفر رجالي');
-INSERT INTO "product" VALUES (20,'E3','أفارول رجالي فوق الركبة');
-INSERT INTO "product" VALUES (21,'G1','أفارول نسائي فوق الركبة');
-INSERT INTO "product" VALUES (22,'G2','أفارول نسائي للكاحل');
-INSERT INTO "product" VALUES (23,'M1','مشد فخذين');
-INSERT INTO "product" VALUES (24,'C3','مشد طويل للكاحل');
-INSERT INTO "product" VALUES (25,'S1','مشد عنق');
-INSERT INTO "product" VALUES (26,'S2','مشد وجه');
-''');
+      final products = [
+        {'_id': 1, 'model': 'A1', 'name': 'مشد صدر'},
+        {'_id': 2, 'model': 'A1+', 'name': 'مشد صدر عريض'},
+        {'_id': 3, 'model': 'B1', 'name': 'مشد حزام بطن'},
+        {'_id': 4, 'model': 'D1', 'name': 'سليب بطن'},
+        {'_id': 5, 'model': 'D2', 'name': 'سليب بطن ظهر عالي'},
+        {'_id': 6, 'model': 'C1', 'name': 'شورت فوق الركبة'},
+        {'_id': 8, 'model': 'C2', 'name': 'شورت تحت الركبة'},
+        {'_id': 9, 'model': 'A2', 'name': 'مشد بودي صدر مع بطن'},
+        {'_id': 10, 'model': 'A3', 'name': 'مشد بودي مع أكمام'},
+        {'_id': 11, 'model': 'H1', 'name': 'مشد ذراعين'},
+        {'_id': 12, 'model': 'H2', 'name': 'مشد ذراعين عريض'},
+        {'_id': 13, 'model': 'K1', 'name': 'شورت فوق الركبة مع خلفية تول'},
+        {'_id': 14, 'model': 'K2', 'name': 'شورت تحت الركبة مع خلفية تول'},
+        {'_id': 15, 'model': 'K3', 'name': 'أفارول فوق الركبة مع خلفية تول'},
+        {'_id': 16, 'model': 'K4', 'name': 'أفارول للكاحل مع خلفية تول'},
+        {'_id': 17, 'model': 'K5', 'name': 'أفارول كامل مع يدين مع خلفية تول'},
+        {'_id': 18, 'model': 'E1', 'name': 'مشد تثدي رجالي'},
+        {'_id': 19, 'model': 'E2', 'name': 'كنزة حفر رجالي'},
+        {'_id': 20, 'model': 'E3', 'name': 'أفارول رجالي فوق الركبة'},
+        {'_id': 21, 'model': 'G1', 'name': 'أفارول نسائي فوق الركبة'},
+        {'_id': 22, 'model': 'G2', 'name': 'أفارول نسائي للكاحل'},
+        {'_id': 23, 'model': 'M1', 'name': 'مشد فخذين'},
+        {'_id': 24, 'model': 'C3', 'name': 'مشد طويل للكاحل'},
+        {'_id': 25, 'model': 'S1', 'name': 'مشد عنق'},
+        {'_id': 26, 'model': 'S2', 'name': 'مشد وجه'},
+      ];
+
+      final batch = db.batch();
+      for (final product in products) {
+        batch.insert(DbConstants.tableProduct, product);
+      }
+      await batch.commit(noResult: true);
     }
   }
 }
