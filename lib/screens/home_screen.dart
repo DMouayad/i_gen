@@ -120,7 +120,6 @@ class _HomeState extends State<Home> {
     );
     return ListenableBuilder(
       listenable: navListener!,
-
       builder: (context, _) {
         return Scaffold(
           floatingActionButton: !context.isMobile || navListener!.value != 0

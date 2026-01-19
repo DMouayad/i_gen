@@ -24,6 +24,8 @@ class InvoiceDetailsController {
   List<InvoiceTableRow> invoiceLines;
   final ValueNotifier<bool> _enableEditing;
   final ValueNotifier<bool> _hasUnsavedChanges = ValueNotifier(false);
+  ValueNotifier<bool> get hasUnsavedChangesNotifier => _hasUnsavedChanges;
+
   bool get hasUnsavedChanges => _hasUnsavedChanges.value;
   double discount = 0;
   set hasUnsavedChanges(bool value) => _hasUnsavedChanges.value = value;

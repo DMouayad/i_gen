@@ -11,6 +11,7 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
 import 'package:i_gen/widgets/invoice_screen/invoice_customer_info.dart';
 import 'package:i_gen/widgets/invoice_table.dart';
+import 'package:i_gen/widgets/prevent_pop.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -115,33 +116,6 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
     }
   }
 
-  Future<bool?> _showUnsavedChangesDialog(BuildContext context) async {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(
-            'Discard Changes?',
-            style: TextStyle(fontSize: 20, color: context.colorScheme.error),
-          ),
-          content: const Text(
-            'You have unsaved changes. Are you sure you want to discard them?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Yes, Discard'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final filledBtnStyle = ButtonStyle(
@@ -164,7 +138,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
           child: Container(
             color: Colors.white,
             constraints: BoxConstraints(
-              maxWidth: editingIsEnabled ? 1200 : 920,
+              maxWidth: editingIsEnabled ? 1100 : 980,
               minHeight: context.height,
             ),
             padding: context.isMobile
@@ -200,29 +174,17 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
       );
     }
 
-    return ValueListenableBuilder(
-      valueListenable: widget.invoiceController.enableEditingNotifier,
-      builder: (context, editingEnabled, _) {
-        return PopScope(
-          canPop:
-              !editingEnabled || !widget.invoiceController.hasUnsavedChanges,
-          onPopInvokedWithResult: (didPop, result) async {
-            if (didPop) {
-              return;
-            }
-            final navigator = Navigator.of(context);
-            final shouldPop = await _showUnsavedChangesDialog(context);
-            if (shouldPop ?? false) {
-              widget.invoiceController.hasUnsavedChanges = false;
-              navigator.maybePop();
-            }
-          },
-          child: Scaffold(
+    return PreventPop(
+      controller: widget.invoiceController,
+      child: ValueListenableBuilder(
+        valueListenable: widget.invoiceController.enableEditingNotifier,
+        builder: (context, editingEnabled, _) {
+          return Scaffold(
             appBar: AppBar(
               leadingWidth: 100,
               leading: TextButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.arrow_back),
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(Icons.arrow_back),
                 label: Text('Back', style: context.textTheme.titleMedium),
               ),
               actions: [
@@ -308,9 +270,9 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
             body: editingEnabled && context.isMobile
                 ? InvoiceDetailsMobile(controller: widget.invoiceController)
                 : Center(child: bodyContent),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
