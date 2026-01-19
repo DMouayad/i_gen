@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:i_gen/utils/context_extensions.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:get_it/get_it.dart';
+
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/invoice_table_row.dart';
@@ -8,7 +11,33 @@ import 'package:i_gen/models/product.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/utils/futuristic.dart';
-import 'package:intl/intl.dart';
+
+/// Encapsulates invoice line data with its controllers
+class InvoiceLineData {
+  final TextEditingController productController;
+  final TextEditingController amountController;
+  final TextEditingController priceController;
+  InvoiceTableRow row;
+
+  InvoiceLineData({required this.row})
+    : productController = TextEditingController(text: row.product.name),
+      amountController = TextEditingController(
+        text: row.amount == 0 ? '' : row.amount.toString(),
+      ),
+      priceController = TextEditingController(
+        text: row.unitPrice == 0 ? '' : row.unitPrice.toString(),
+      );
+
+  void dispose() {
+    productController.dispose();
+    amountController.dispose();
+    priceController.dispose();
+  }
+
+  void updatePrice(num price, String Function(num) formatter) {
+    priceController.text = price == 0 ? '' : formatter(price);
+  }
+}
 
 class InvoiceLineInputMobile extends StatefulWidget {
   const InvoiceLineInputMobile({super.key, required this.controller});
@@ -19,468 +48,550 @@ class InvoiceLineInputMobile extends StatefulWidget {
 }
 
 class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
-  late List<InvoiceTableRow> _invoiceRows;
+  final List<InvoiceLineData> _lines = [];
   ProductsPricing? _productsPricing;
-  ({String? name, String currency}) _selectedPriceCategory = (
+  ({String currency, String? name}) _priceCategory = (
     currency: 'USD',
     name: null,
   );
-  final products = GetIt.I.get<ProductsController>().products;
 
-  final List<TextEditingController> _amountControllers = [];
-  final List<TextEditingController> _priceControllers = [];
+  Map<String, Product> get _products =>
+      GetIt.I.get<ProductsController>().products;
+  bool get _isEditing => widget.controller.editingIsEnabled;
 
   @override
   void initState() {
     super.initState();
-    _invoiceRows = List.from(widget.controller.invoiceLines);
-    if (_invoiceRows.isEmpty) {
-      _invoiceRows.add(_newEmptyRow());
-    }
-    _initializeControllers();
-    _fetchInitialData();
-
-    widget.controller.enableEditingNotifier.addListener(_onEditingToggle);
+    _initializeLines();
+    _fetchPricingData();
+    widget.controller.enableEditingNotifier.addListener(_onEditingChanged);
   }
 
   @override
   void dispose() {
-    widget.controller.enableEditingNotifier.removeListener(_onEditingToggle);
-    _clearControllers();
+    widget.controller.enableEditingNotifier.removeListener(_onEditingChanged);
+    for (final line in _lines) {
+      line.dispose();
+    }
     super.dispose();
   }
 
-  void _initializeControllers() {
-    _clearControllers();
-    for (var row in _invoiceRows) {
-      _addControllersForRow(row);
+  void _initializeLines() {
+    final existingRows = widget.controller.invoiceLines;
+    if (existingRows.isEmpty) {
+      _lines.add(InvoiceLineData(row: _createEmptyRow()));
+    } else {
+      _lines.addAll(existingRows.map((row) => InvoiceLineData(row: row)));
     }
   }
 
-  void _addControllersForRow(InvoiceTableRow row) {
-    final amountController = TextEditingController(
-      text: row.amount == 0 ? '' : row.amount.toString(),
-    );
-    final priceController = TextEditingController(
-      text: row.unitPrice == 0
-          ? ''
-          : _formatNumber(row.unitPrice, decimal: true),
-    );
-
-    _amountControllers.add(amountController);
-    _priceControllers.add(priceController);
-  }
-
-  void _clearControllers() {
-    for (var controller in _amountControllers) {
-      controller.dispose();
-    }
-    for (var controller in _priceControllers) {
-      controller.dispose();
-    }
-    _amountControllers.clear();
-    _priceControllers.clear();
-  }
-
-  void _onEditingToggle() {
-    if (!widget.controller.editingIsEnabled) {
-      _saveInvoiceLines();
-    }
-  }
-
-  Future<void> _fetchInitialData() async {
+  Future<void> _fetchPricingData() async {
     _productsPricing = await GetIt.I
         .get<ProductPricingRepo>()
         .getProductsPricing();
     if (widget.controller.invoice?.currency case String currency) {
-      _selectedPriceCategory = (currency: currency, name: null);
+      _priceCategory = (currency: currency, name: null);
     }
-    if (mounted) {
-      setState(() {}); // Rebuild to display fetched data
-    }
+    if (mounted) setState(() {});
   }
 
-  InvoiceTableRow _newEmptyRow() {
-    return InvoiceTableRow(
-      unitPrice: 0,
-      amount: 0,
-      product: Product(id: -1, model: '', name: ''), // Placeholder product
+  void _onEditingChanged() {
+    if (!_isEditing) _saveLines();
+  }
+
+  InvoiceTableRow _createEmptyRow() => InvoiceTableRow(
+    unitPrice: 0,
+    amount: 0,
+    product: Product(id: -1, model: '', name: ''),
+  );
+
+  // ===== Line Operations =====
+
+  void _addLine() {
+    setState(() {
+      _lines.add(InvoiceLineData(row: _createEmptyRow()));
+      _markUnsaved();
+    });
+  }
+
+  void _removeLine(int index) {
+    if (index < 0 || index >= _lines.length) return;
+    setState(() {
+      _lines[index].dispose();
+      _lines.removeAt(index);
+      if (_lines.isEmpty) _addLine();
+      _markUnsaved();
+    });
+  }
+
+  void _updateProduct(int index, String productName) {
+    final product = _products.values.firstWhere(
+      (p) => p.name == productName,
+      orElse: () => Product(id: -1, model: '', name: ''),
     );
-  }
+    if (product.model.isEmpty) return;
 
-  void _addInvoiceLine() {
     setState(() {
-      final newRow = _newEmptyRow();
-      _invoiceRows.add(newRow);
-      _addControllersForRow(newRow);
-      widget.controller.hasUnsavedChanges = true;
-    });
-  }
-
-  void _removeInvoiceLine(int index) {
-    setState(() {
-      // Dispose and remove controllers
-      _amountControllers[index].dispose();
-      _priceControllers[index].dispose();
-      _amountControllers.removeAt(index);
-      _priceControllers.removeAt(index);
-
-      // Remove row
-      _invoiceRows.removeAt(index);
-      widget.controller.hasUnsavedChanges = true;
-
-      // Add an empty row if the list becomes empty
-      if (_invoiceRows.isEmpty) {
-        _addInvoiceLine();
-      }
-    });
-  }
-
-  void _updateProduct(int index, String? newModel) {
-    if (newModel == null) return;
-    setState(() {
-      final product = products[newModel];
-      if (product != null) {
-        final currentLine = _invoiceRows[index];
-        final newUnitPrice = _getModelPriceByCategory(
-          product.model,
-          _selectedPriceCategory.name,
-        );
-
-        _invoiceRows[index] = currentLine.copyWith(
-          product: product,
-          unitPrice: newUnitPrice ?? 0,
-        );
-
-        // Update the price controller's text
-        final formattedPrice = (newUnitPrice == null || newUnitPrice == 0)
-            ? ''
-            : _formatNumber(newUnitPrice);
-        _priceControllers[index].text = formattedPrice;
-
-        widget.controller.hasUnsavedChanges = true;
-      }
+      final newPrice = _getProductPrice(product.model) ?? 0;
+      _lines[index].row = _lines[index].row.copyWith(
+        product: product,
+        unitPrice: newPrice,
+      );
+      _lines[index].updatePrice(newPrice, _formatNumber);
+      _markUnsaved();
     });
   }
 
   void _updateAmount(int index, String value) {
-    final int? amount = int.tryParse(value);
-    if (amount != null && amount >= 0 && _invoiceRows[index].amount != amount) {
-      setState(() {
-        _invoiceRows[index] = _invoiceRows[index].copyWith(amount: amount);
-        widget.controller.hasUnsavedChanges = true;
-      });
+    final amount = int.tryParse(value) ?? 0;
+    if (amount >= 0) {
+      _lines[index].row = _lines[index].row.copyWith(amount: amount);
+      _markUnsaved();
+      setState(() {});
     }
   }
 
-  void _updateUnitPrice(int index, String value) {
-    final unitPrice = num.tryParse(value);
-
-    if (unitPrice != null &&
-        unitPrice >= 0 &&
-        _invoiceRows[index].unitPrice != unitPrice) {
-      setState(() {
-        _invoiceRows[index] = _invoiceRows[index].copyWith(
-          unitPrice: unitPrice,
-        );
-        widget.controller.hasUnsavedChanges = true;
-      });
+  void _updatePrice(int index, String value) {
+    final price = num.tryParse(value.replaceAll(',', '')) ?? 0;
+    if (price >= 0) {
+      _lines[index].row = _lines[index].row.copyWith(unitPrice: price);
+      _markUnsaved();
+      setState(() {});
     }
   }
 
-  double? _getModelPriceByCategory(String? model, String? pricingCategory) {
-    if (model == null || pricingCategory == null || _productsPricing == null) {
-      return null;
-    }
-    return _productsPricing![model]?[pricingCategory]?.price;
-  }
-
-  String _formatNumber(num n, {bool decimal = true}) {
-    return switch (_selectedPriceCategory.currency) {
-      'SP' => NumberFormat.decimalPatternDigits(decimalDigits: 0).format(n),
-      'USD' => NumberFormat.decimalPatternDigits(
-        decimalDigits: decimal ? 2 : 0,
-      ).format(n),
-      _ => NumberFormat.decimalPatternDigits(decimalDigits: 0).format(n),
-    };
-  }
-
-  void _saveInvoiceLines() {
-    // First, ensure the internal state `_invoiceRows` is up-to-date with controllers
-    for (int i = 0; i < _invoiceRows.length; i++) {
-      final amount = int.tryParse(_amountControllers[i].text) ?? 0;
-      final price = num.tryParse(_priceControllers[i].text) ?? 0.0;
-      if (_invoiceRows[i].amount != amount ||
-          _invoiceRows[i].unitPrice != price) {
-        _invoiceRows[i] = _invoiceRows[i].copyWith(
-          amount: amount,
-          unitPrice: price,
-        );
-      }
+  void _saveLines() {
+    // Sync controller values
+    for (final line in _lines) {
+      final amount = int.tryParse(line.amountController.text) ?? 0;
+      final price =
+          num.tryParse(line.priceController.text.replaceAll(',', '')) ?? 0;
+      line.row = line.row.copyWith(amount: amount, unitPrice: price);
     }
 
-    final validInvoiceLines = _invoiceRows.where(
-      (row) =>
-          row.product.model.isNotEmpty && row.amount > 0 && row.unitPrice >= 0,
-    );
-
-    widget.controller.invoiceLines = validInvoiceLines.toList();
+    widget.controller.invoiceLines = _lines
+        .where((l) => l.row.product.model.isNotEmpty && l.row.amount > 0)
+        .map((l) => l.row)
+        .toList();
     widget.controller.hasUnsavedChanges = false;
   }
 
-  void _onPriceCategoryChanged((String, String?)? newValue) {
-    if (newValue == null) return;
+  void _markUnsaved() => widget.controller.hasUnsavedChanges = true;
+
+  // ===== Helpers =====
+
+  double? _getProductPrice(String model) {
+    if (_priceCategory.name == null || _productsPricing == null) return null;
+    return _productsPricing![model]?[_priceCategory.name]?.price;
+  }
+
+  String _formatNumber(num n) {
+    final decimals = _priceCategory.currency == 'USD' ? 1 : 0;
+    return NumberFormat.decimalPatternDigits(decimalDigits: decimals).format(n);
+  }
+
+  void _onPriceCategoryChanged((String, String?)? value) {
+    if (value == null) return;
     setState(() {
-      _selectedPriceCategory = (currency: newValue.$1, name: newValue.$2);
-      // Update unit prices for all existing lines
-      for (int i = 0; i < _invoiceRows.length; i++) {
-        final currentLine = _invoiceRows[i];
-        if (currentLine.product.model.isEmpty) continue;
-
-        final newUnitPrice = _getModelPriceByCategory(
-          currentLine.product.model,
-          _selectedPriceCategory.name,
-        );
-        _invoiceRows[i] = currentLine.copyWith(
-          unitPrice: newUnitPrice ?? currentLine.unitPrice,
-        );
-
-        // Update controller
-        final priceToShow = newUnitPrice ?? currentLine.unitPrice;
-        _priceControllers[i].text = priceToShow == 0
-            ? ''
-            : _formatNumber(priceToShow, decimal: true);
+      _priceCategory = (currency: value.$1, name: value.$2);
+      for (final line in _lines) {
+        if (line.row.product.model.isEmpty) continue;
+        final newPrice = _getProductPrice(line.row.product.model);
+        if (newPrice != null) {
+          line.row = line.row.copyWith(unitPrice: newPrice);
+          line.updatePrice(newPrice, _formatNumber);
+        }
       }
     });
   }
+
+  // ===== UI =====
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildHeader(),
-        _buildInvoiceLinesList(),
-        _buildAddLineButton(),
+        _Header(
+          lineCount: _lines.length,
+          priceCategory: _priceCategory,
+          isEditing: _isEditing,
+          onCategoryChanged: _onPriceCategoryChanged,
+        ),
+        _buildLinesList(),
+        if (_isEditing) _buildAddButton(),
       ],
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildLinesList() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      itemCount: _lines.length,
+      itemBuilder: (context, index) => _InvoiceLineCard(
+        key: ValueKey(_lines[index].hashCode),
+        index: index,
+        lineData: _lines[index],
+        products: _products,
+        currency: _priceCategory.currency,
+        isEditing: _isEditing,
+        formatNumber: _formatNumber,
+        onRemove: () => _removeLine(index),
+        onProductSelected: (name) => _updateProduct(index, name),
+        onAmountChanged: (value) => _updateAmount(index, value),
+        onPriceChanged: (value) => _updatePrice(index, value),
+      ),
+    );
+  }
+
+  Widget _buildAddButton() {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(16),
+      child: FilledButton.tonalIcon(
+        onPressed: _addLine,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Line'),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(double.infinity, 48),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== Header Widget =====
+
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.lineCount,
+    required this.priceCategory,
+    required this.isEditing,
+    required this.onCategoryChanged,
+  });
+
+  final int lineCount;
+  final ({String currency, String? name}) priceCategory;
+  final bool isEditing;
+  final ValueChanged<(String, String?)?> onCategoryChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'Invoice Lines',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Icon(Icons.receipt_long, color: colors.primary),
+          const SizedBox(width: 8),
+          Text(
+            'Items ($lineCount)',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
-          Futuristic(
-            autoStart: true,
-            futureBuilder: () => GetIt.I.get<PricingCategoryRepo>().getAll(),
-            dataBuilder: (context, categories) {
-              return DropdownButtonHideUnderline(
-                child: DropdownButton<(String, String?)>(
-                  isDense: true,
-                  iconSize: 20,
-                  value: (
-                    _selectedPriceCategory.currency,
-                    _selectedPriceCategory.name,
-                  ),
-                  style: const TextStyle(fontSize: 16, color: Colors.black),
-                  hint: const Text('Select price list'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: ('SP', null),
-                      child: Text('Custom ل.س'),
-                    ),
-                    const DropdownMenuItem(
-                      value: ('USD', null),
-                      child: Text('Custom \$(USD)'),
-                    ),
-                    ...categories.map(
-                      (e) => DropdownMenuItem(
-                        value: (e.currency, e.name),
-                        child: Text(
-                          '${e.name} (${e.currency})',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged: widget.controller.editingIsEnabled
-                      ? _onPriceCategoryChanged
-                      : null,
-                ),
-              );
-            },
-          ),
+          const Spacer(),
+          _buildDropdown(context),
         ],
       ),
     );
   }
 
-  Widget _buildInvoiceLinesList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _invoiceRows.length,
-      itemBuilder: (context, index) {
-        final row = _invoiceRows[index];
-        return _InvoiceLineCard(
-          row: row,
-          index: index,
-          amountController: _amountControllers[index],
-          priceController: _priceControllers[index],
-          products: products,
-          editingIsEnabled: widget.controller.editingIsEnabled,
-          onRemoveLine: _removeInvoiceLine,
-          onUpdateProduct: _updateProduct,
-          onUpdateAmount: _updateAmount,
-          onUpdateUnitPrice: _updateUnitPrice,
-          formatNumber: _formatNumber,
+  Widget _buildDropdown(BuildContext context) {
+    return Futuristic(
+      autoStart: true,
+      futureBuilder: () => GetIt.I.get<PricingCategoryRepo>().getAll(),
+      busyBuilder: (_) => const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+      dataBuilder: (_, categories) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<(String, String?)>(
+              isDense: true,
+              value: (priceCategory.currency, priceCategory.name),
+              items: [
+                const DropdownMenuItem(
+                  value: ('SP', null),
+                  child: Text('Custom (ل.س)'),
+                ),
+                const DropdownMenuItem(
+                  value: ('USD', null),
+                  child: Text('Custom (\$)'),
+                ),
+                ...categories.map(
+                  (e) => DropdownMenuItem(
+                    value: (e.currency, e.name),
+                    child: Text('${e.name} (${e.currency})'),
+                  ),
+                ),
+              ],
+              onChanged: isEditing ? onCategoryChanged : null,
+            ),
+          ),
         );
       },
     );
   }
+}
 
-  Widget _buildAddLineButton() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: TextButton.icon(
-        onPressed: _addInvoiceLine,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Line'),
-      ),
-    );
-  }
-} // This is the closing brace for the _InvoiceLineInputMobileState class.
+// ===== Invoice Line Card =====
 
 class _InvoiceLineCard extends StatelessWidget {
   const _InvoiceLineCard({
-    required this.row,
+    super.key,
     required this.index,
-    required this.amountController,
-    required this.priceController,
+    required this.lineData,
     required this.products,
-    required this.editingIsEnabled,
-    required this.onRemoveLine,
-    required this.onUpdateProduct,
-    required this.onUpdateAmount,
-    required this.onUpdateUnitPrice,
+    required this.currency,
+    required this.isEditing,
     required this.formatNumber,
+    required this.onRemove,
+    required this.onProductSelected,
+    required this.onAmountChanged,
+    required this.onPriceChanged,
   });
 
-  final InvoiceTableRow row;
   final int index;
-  final TextEditingController amountController;
-  final TextEditingController priceController;
+  final InvoiceLineData lineData;
   final Map<String, Product> products;
-  final bool editingIsEnabled;
-  final void Function(int) onRemoveLine;
-  final void Function(int, String?) onUpdateProduct;
-  final void Function(int, String) onUpdateAmount;
-  final void Function(int, String) onUpdateUnitPrice;
-  final String Function(num, {bool decimal}) formatNumber;
+  final String currency;
+  final bool isEditing;
+  final String Function(num) formatNumber;
+  final VoidCallback onRemove;
+  final ValueChanged<String> onProductSelected;
+  final ValueChanged<String> onAmountChanged;
+  final ValueChanged<String> onPriceChanged;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final total = lineData.row.lineTotal;
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colors.outlineVariant.withOpacity(0.5)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Row 1: Line number + Product + Delete
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TypeAheadField<String>(
-                    builder: (context, controller, focusNode) => TextFormField(
-                      initialValue: row.product.name,
-                      focusNode: focusNode,
-                      textAlign: TextAlign.center,
-                      onChanged: (v) => controller.text = v,
-                      decoration: const InputDecoration(
-                        hint: Text('Select Product'),
-                        labelText: 'Product',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                    onSelected: (value) => onUpdateProduct(index, value),
-                    itemBuilder: (context, value) =>
-                        ListTile(dense: true, title: Text(value)),
-                    suggestionsCallback: (q) => products.values
-                        .where((p) => p.name.contains(q) || p.model.contains(q))
-                        .map((e) => e.name)
-                        .toList(),
+                _LineNumber(index: index + 1),
+                const SizedBox(width: 12),
+                Expanded(child: _buildProductField()),
+                if (isEditing)
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, color: colors.error),
+                    onPressed: onRemove,
+                    tooltip: 'Remove',
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.remove_circle_outline,
-                    color: Colors.red,
-                  ),
-                  onPressed: () => onRemoveLine(index),
-                ),
               ],
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 12),
+            // Row 2: Qty + Price + Total
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) => onUpdateAmount(index, value),
-                    readOnly: !editingIsEnabled,
+                  flex: 2,
+                  child: _buildTextField(
+                    'Qty',
+                    lineData.amountController,
+                    onAmountChanged,
                   ),
                 ),
-                const SizedBox(width: 8.0),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: TextFormField(
-                    controller: priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit Price',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (value) => onUpdateUnitPrice(index, value),
-                    readOnly: !editingIsEnabled,
+                  flex: 3,
+                  child: _buildTextField(
+                    'Price',
+                    lineData.priceController,
+                    onPriceChanged,
+                    suffix: currency,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _TotalBadge(
+                    total: total,
+                    currency: currency,
+                    formatNumber: formatNumber,
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8.0),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Line Total: ${formatNumber(row.lineTotal)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildProductField() {
+    return TypeAheadField<String>(
+      controller: lineData.productController,
+      builder: (context, controller, focusNode) => TextField(
+        controller: controller,
+        focusNode: focusNode,
+        enabled: isEditing,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+        textDirection: TextDirection.rtl,
+        decoration: InputDecoration(
+          hintText: 'Search product...',
+          prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+          isDense: true,
+        ),
+      ),
+      onSelected: (value) {
+        onProductSelected(value);
+        lineData.productController.text = value;
+      },
+
+      itemBuilder: (context, name) {
+        final product = products.values.firstWhere(
+          (p) => p.name == name,
+          orElse: () => Product(id: -1, model: '', name: name),
+        );
+        return ListTile(
+          dense: true,
+          title: Text(
+            '${product.model}: $name',
+            style: context.textTheme.bodyLarge,
+          ),
+        );
+      },
+      suggestionsCallback: (query) => products.values
+          .where(
+            (p) =>
+                p.name.toLowerCase().contains(query.toLowerCase()) ||
+                p.model.toLowerCase().contains(query.toLowerCase()),
+          )
+          .map((e) => e.name)
+          .toList(),
+      emptyBuilder: (_) => const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text('No products found'),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    ValueChanged<String> onChanged, {
+    String? suffix,
+  }) {
+    return TextField(
+      controller: controller,
+      readOnly: !isEditing,
+      keyboardType: TextInputType.number,
+      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+      decoration: InputDecoration(
+        labelText: label,
+        suffixText: suffix,
+
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        isDense: true,
+      ),
+      onChanged: onChanged,
+    );
+  }
 }
+
+// ===== Helper Widgets =====
+
+class _LineNumber extends StatelessWidget {
+  const _LineNumber({required this.index});
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Center(
+        child: Text(
+          '$index',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: colors.onPrimaryContainer,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TotalBadge extends StatelessWidget {
+  const _TotalBadge({
+    required this.total,
+    required this.currency,
+    required this.formatNumber,
+  });
+  final num total;
+  final String currency;
+  final String Function(num) formatNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            formatNumber(total),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: colors.primary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===== Extension =====
 
 extension on InvoiceTableRow {
   InvoiceTableRow copyWith({num? unitPrice, int? amount, Product? product}) {
