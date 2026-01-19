@@ -69,20 +69,11 @@ create table ${DbConstants.tableInvoiceLine} (
   ${DbConstants.columnInvoiceLineAmount} integer not null,
   ${DbConstants.columnInvoiceLinePrice} REAL not null,
   foreign key(${DbConstants.columnInvoiceLineInvoiceId}) references ${DbConstants.tableInvoice}(${DbConstants.columnId}),
-  foreign key(${DbConstants.columnInvoiceLineProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId})
+  foreign key(${DbConstants.columnInvoiceLineProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId}) ON DELETE RESTRICT
   unique(${DbConstants.columnInvoiceLineInvoiceId}, ${DbConstants.columnInvoiceLineProductId}) ON CONFLICT REPLACE
 
   )
 ''');
-
-        await db.execute('''
-create table ${DbConstants.tableInvoiceLines} (
-  ${DbConstants.columnInvoiceLineInvoiceId} integer not null,
-  ${DbConstants.columnInvoiceLineProductId} integer not null,
-  foreign key(${DbConstants.columnInvoiceLineInvoiceId}) references ${DbConstants.tableInvoice}(${DbConstants.columnId}),
-  foreign key(${DbConstants.columnInvoiceLineProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId})
-  )
- ''');
 
         await db.execute('''
 create table ${DbConstants.tablePrices} (
@@ -90,7 +81,7 @@ create table ${DbConstants.tablePrices} (
   ${DbConstants.columnPricesProductId} integer not null,
   ${DbConstants.columnPricesPrice} REAL not null,
   ${DbConstants.columnPricesPriceCategoryId} integer not null,
-  foreign key(${DbConstants.columnPricesProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId}),
+  foreign key(${DbConstants.columnPricesProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId}) ON DELETE CASCADE,
   foreign key(${DbConstants.columnPricesPriceCategoryId}) references ${DbConstants.tablePriceCategory}(${DbConstants.columnId})
   unique(${DbConstants.columnPricesProductId}, ${DbConstants.columnPricesPriceCategoryId}) ON CONFLICT REPLACE
   )
