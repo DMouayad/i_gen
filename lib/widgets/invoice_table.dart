@@ -32,7 +32,7 @@ class InvoiceTableState extends State<InvoiceTable> {
 
   final products = GetIt.I.get<ProductsController>().products;
   var textStyle = TextStyle(
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: FontWeight.bold,
     color: Colors.black,
   );
@@ -82,7 +82,7 @@ class InvoiceTableState extends State<InvoiceTable> {
 
   double tableHeight = 0;
   final double tableRowHeight = 52;
-  final double extraHeight = 100;
+  final double extraHeight = 85;
   final double footerExpandedHeight = 135;
   final double heightToAddWhenFooterIsExpanded = 104;
   double getTotal(TrinaGridStateManager stateManager) {
@@ -585,10 +585,14 @@ class InvoiceTableState extends State<InvoiceTable> {
             stateManager.columnFooterHeight = footerExpandedHeight;
           }
           widget.controller.enableEditingNotifier.addListener(() {
-            stateManager.hideColumn(
-              columns.last,
-              !widget.controller.editingIsEnabled,
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.isMobile) {
+                stateManager.hideColumn(
+                  columns.last,
+                  !widget.controller.editingIsEnabled,
+                );
+              }
+            });
             if (widget.controller.editingIsEnabled) {
               onEnableEditing();
             } else {
@@ -621,10 +625,6 @@ class InvoiceTableState extends State<InvoiceTable> {
       setState(() {
         tableHeight -= heightToAddWhenFooterIsExpanded;
       });
-    } else {
-      // setState(() {
-      //   tableHeight -= 15;
-      // });
     }
     final invoiceRows = <InvoiceTableRow>[];
     for (var row in stateManager.refRows) {
