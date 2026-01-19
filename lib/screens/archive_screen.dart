@@ -46,93 +46,84 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Navigator(
-      onDidRemovePage: (page) {},
-      pages: [
-        MaterialPage(
-          name: '/',
-          child: Container(
-            constraints: BoxConstraints(maxWidth: 1024),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(top: 30),
-              child: Column(
+    return Container(
+      constraints: BoxConstraints(maxWidth: 1024),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(top: 30),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: OverflowBar(
+                alignment: MainAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: OverflowBar(
-                      alignment: MainAxisAlignment.start,
-                      children: [
-                        Text('SORT'),
-                        SizedBox(width: 10),
-                        DropdownButton<OrderBy?>(
-                          value: orderBy,
-                          hint: Text('Sort'),
-                          items: [
-                            DropdownMenuItem(
-                              value: OrderBy('customer', true),
-                              child: Text('From A-Z'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderBy('customer', false),
-                              child: Text('From Z-A'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderBy('date', false),
-                              child: Text('From Newest'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderBy('date', true),
-                              child: Text('From Oldest'),
-                            ),
-                            DropdownMenuItem(value: null, child: Text('None')),
-                          ],
-                          onChanged: (value) async {
-                            if (value != null) {
-                              orderBy = value;
-                              handleOnSorted();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
+                  Text('SORT'),
+                  SizedBox(width: 10),
+                  DropdownButton<OrderBy?>(
+                    value: orderBy,
+                    hint: Text('Sort'),
+                    items: [
+                      DropdownMenuItem(
+                        value: OrderBy('customer', true),
+                        child: Text('From A-Z'),
+                      ),
+                      DropdownMenuItem(
+                        value: OrderBy('customer', false),
+                        child: Text('From Z-A'),
+                      ),
+                      DropdownMenuItem(
+                        value: OrderBy('date', false),
+                        child: Text('From Newest'),
+                      ),
+                      DropdownMenuItem(
+                        value: OrderBy('date', true),
+                        child: Text('From Oldest'),
+                      ),
+                      DropdownMenuItem(value: null, child: Text('None')),
+                    ],
+                    onChanged: (value) async {
+                      if (value != null) {
+                        orderBy = value;
+                        handleOnSorted();
+                      }
+                    },
                   ),
-
-                  (isLoading)
-                      ? CircularProgressIndicator()
-                      : invoices.isEmpty
-                      ? Text('No invoices found')
-                      : Container(
-                          padding: EdgeInsets.symmetric(vertical: 50),
-                          height: context.height,
-                          width: 1000,
-                          child: ListView.separated(
-                            itemCount: invoices.length,
-                            separatorBuilder: (context, index) =>
-                                SizedBox(height: 5),
-                            itemBuilder: (context, index) => _Item(
-                              invoice: invoices[index],
-                              onInvoiceSelected: (invoiceController) {
-                                widget.onLoaded(invoiceController);
-                              },
-                              onSaved: (newInvoice) {
-                                setState(() {
-                                  invoices[index] = newInvoice;
-                                });
-                              },
-                              onDeleted: () {
-                                setState(() {
-                                  invoices.remove(invoices[index]);
-                                });
-                              },
-                            ),
-                          ),
-                        ),
                 ],
               ),
             ),
-          ),
+
+            (isLoading)
+                ? CircularProgressIndicator()
+                : invoices.isEmpty
+                ? Text('No invoices found')
+                : Container(
+                    padding: EdgeInsets.symmetric(vertical: 50),
+                    height: context.height,
+                    width: 1000,
+                    child: ListView.separated(
+                      itemCount: invoices.length,
+                      separatorBuilder: (context, index) => SizedBox(height: 5),
+                      itemBuilder: (context, index) => _Item(
+                        invoice: invoices[index],
+                        onInvoiceSelected: (invoiceController) {
+                          widget.onLoaded(invoiceController);
+                        },
+                        onSaved: (newInvoice) {
+                          setState(() {
+                            invoices[index] = newInvoice;
+                          });
+                        },
+                        onDeleted: () {
+                          setState(() {
+                            invoices.remove(invoices[index]);
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

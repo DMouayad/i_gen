@@ -6,14 +6,18 @@ import 'package:i_gen/repos/customer_repo.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 
 class InvoiceCustomerInfo extends StatelessWidget {
-  const InvoiceCustomerInfo(this.controller, {super.key});
+  const InvoiceCustomerInfo(
+    this.controller, {
+    this.verticalPadding = 30,
+    super.key,
+  });
 
   final InvoiceDetailsController controller;
-
+  final double verticalPadding;
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 30),
+      padding: EdgeInsets.symmetric(horizontal: 5.0, vertical: verticalPadding),
       child: Column(
         children: [
           Container(

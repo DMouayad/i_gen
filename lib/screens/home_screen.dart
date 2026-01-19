@@ -43,7 +43,11 @@ class _HomeState extends State<Home> {
         context,
         title: 'Invoice was not saved',
         content: 'Your invoice has unsaved changes, do you want to continue?',
-      );
+      ).then((confirmed) {
+        if (confirmed ?? false) {
+          currentInvoiceDetailsController?.hasUnsavedChanges = false;
+        }
+      });
       return;
     } else if (oldIndex == _productsPageIndex) {
       if (unsavedProductCountNotifier.value > 0) {
@@ -208,7 +212,10 @@ class _HomeState extends State<Home> {
                     alignment: Alignment.center,
                     padding: context.isMobile
                         ? EdgeInsets.zero
-                        : EdgeInsets.symmetric(vertical: 50, horizontal: 24),
+                        : EdgeInsets.symmetric(
+                            vertical: navListener!.value == 0 ? 20 : 50,
+                            horizontal: 24,
+                          ),
                     child: switch (navListener!.value) {
                       0 => Center(
                         child: ArchiveScreen(

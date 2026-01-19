@@ -24,6 +24,7 @@ dependencies:
     path_provider: ^2.1.5
     pdf: ^3.11.3
     path: ^1.9.1
+    gal: ^2.3.2
 
 dev_dependencies:
     flutter_test:
