@@ -4,17 +4,18 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+
 import 'package:gal/gal.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/utils/context_extensions.dart';
-import 'package:i_gen/widgets/invoice_details_mobile.dart';
 import 'package:i_gen/widgets/invoice_screen/invoice_customer_info.dart';
 import 'package:i_gen/widgets/invoice_table.dart';
 import 'package:i_gen/widgets/prevent_pop.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 
 class InvoiceDetails extends StatefulWidget {
   const InvoiceDetails({
@@ -162,11 +163,9 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
     final Widget bodyContent;
 
     if (_isCapturing || context.isMobile) {
-      bodyContent = Flexible(
-        child: RepaintBoundary(
-          key: globalKey,
-          child: FittedBox(child: invoiceContent),
-        ),
+      bodyContent = RepaintBoundary(
+        key: globalKey,
+        child: FittedBox(child: invoiceContent),
       );
     } else {
       bodyContent = SingleChildScrollView(
@@ -181,12 +180,12 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
         builder: (context, editingEnabled, _) {
           return Scaffold(
             appBar: AppBar(
-              leadingWidth: 100,
-              leading: TextButton.icon(
-                onPressed: () => Navigator.maybePop(context),
-                icon: const Icon(Icons.arrow_back),
-                label: Text('Back', style: context.textTheme.titleMedium),
-              ),
+              // leadingWidth: 100,
+              // leading: TextButton.icon(
+              //   onPressed: () => Navigator.maybePop(context),
+              //   icon: const Icon(Icons.arrow_back),
+              //   label: Text('Back', style: context.textTheme.titleMedium),
+              // ),
               actions: [
                 SizedBox(
                   width: context.width * .8,
@@ -195,10 +194,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                       alignment: AlignmentDirectional.centerEnd,
                       child: FilledButton.icon(
                         onPressed: () {
-                          if (widget.invoiceController.hasUnsavedChanges) {
-                            widget.invoiceController.enableEditing = false;
-                            widget.invoiceController.hasUnsavedChanges = false;
-                          }
+                          widget.invoiceController.saveToDB();
                         },
                         label: const Text('Save'),
                         icon: const Icon(Icons.save),
@@ -236,24 +232,24 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                         //       );
                         //     },
                         //   ),
-                        TextButton.icon(
-                          onPressed: () {
-                            widget.invoiceController.enableEditing = true;
-                            widget.invoiceController.hasUnsavedChanges = true;
-                          },
-                          label: Text('Edit'),
-                          icon: const Icon(Icons.edit),
-                          style: filledBtnStyle,
-                        ),
+                        if (!context.isMobile)
+                          TextButton.icon(
+                            onPressed: () {
+                              widget.invoiceController.enableEditing = true;
+                            },
+                            label: Text('Edit'),
+                            icon: const Icon(Icons.edit),
+                            style: filledBtnStyle,
+                          ),
                         TextButton.icon(
                           onPressed: saveAsImage,
-                          label: const Text('Image'),
+                          label: const Text('Export Image'),
                           icon: const Icon(Icons.image),
                           style: filledBtnStyle,
                         ),
                         TextButton.icon(
                           onPressed: saveAsPdf,
-                          label: const Text('PDF'),
+                          label: const Text('Export PDF'),
                           icon: const Icon(Icons.file_open_rounded),
                           style: filledBtnStyle,
                         ),
@@ -267,9 +263,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                 ),
               ],
             ),
-            body: editingEnabled && context.isMobile
-                ? InvoiceDetailsMobile(controller: widget.invoiceController)
-                : Center(child: bodyContent),
+            body: Center(child: bodyContent),
           );
         },
       ),

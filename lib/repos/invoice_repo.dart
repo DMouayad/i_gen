@@ -92,7 +92,6 @@ ${orderBy != null ? ' ORDER BY ${orderBy.field} ${orderBy.isAscending ? " asc" :
     for (var row in result) {
       var invoice = Invoice.fromMap(row);
       if (invoice != null) {
-        print(invoice.id);
         if (row case {
           'amount': int amount,
           'product_id': int productId,

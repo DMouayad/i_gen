@@ -3,16 +3,10 @@ import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 
 class PreventPop extends StatelessWidget {
-  const PreventPop({
-    super.key,
-    required this.child,
-    required this.controller,
-    this.prevent = false,
-  });
+  const PreventPop({super.key, required this.child, required this.controller});
 
   final Widget child;
   final InvoiceDetailsController controller;
-  final bool prevent;
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +28,6 @@ class PreventPop extends StatelessWidget {
   Future<void> _handlePopBlocked(BuildContext context) async {
     // Check if context is still valid
     if (!context.mounted) return;
-
-    // If prevent is true (hard block), don't show dialog - just block
-    if (prevent) return;
 
     // Show confirmation dialog for unsaved changes
     final shouldDiscard = await _showDiscardDialog(context);

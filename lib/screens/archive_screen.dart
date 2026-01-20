@@ -6,6 +6,7 @@ import 'package:i_gen/models/order_by.dart';
 import 'package:i_gen/repos/invoice_repo.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
+import 'package:i_gen/widgets/invoice_details_mobile.dart';
 import 'package:intl/intl.dart';
 
 class ArchiveScreen extends StatefulWidget {
@@ -157,10 +158,13 @@ class _Item extends StatelessWidget {
               builder: (context) {
                 final invoiceController = InvoiceDetailsController(invoice);
                 onInvoiceSelected(invoiceController);
-                return InvoiceDetails(
-                  invoiceController: invoiceController,
-                  onSaved: onSaved,
-                );
+                invoiceController.enableEditing = true;
+                return context.isMobile
+                    ? InvoiceDetailsMobile(controller: invoiceController)
+                    : InvoiceDetails(
+                        invoiceController: invoiceController,
+                        onSaved: onSaved,
+                      );
               },
             ),
           );

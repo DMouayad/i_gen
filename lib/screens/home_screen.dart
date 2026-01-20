@@ -9,6 +9,7 @@ import 'package:i_gen/screens/products_screen.dart';
 import 'package:i_gen/screens/products_screen_mobile.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
+import 'package:i_gen/widgets/invoice_details_mobile.dart';
 import 'package:i_gen/widgets/product_pricing_table.dart';
 
 const _productsPageIndex = 1;
@@ -105,8 +106,15 @@ class _HomeState extends State<Home> {
     currentInvoiceDetailsController = InvoiceDetailsController(null);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) =>
-            InvoiceDetails(invoiceController: currentInvoiceDetailsController!),
+        builder: (context) {
+          return context.isMobile
+              ? InvoiceDetailsMobile(
+                  controller: currentInvoiceDetailsController!,
+                )
+              : InvoiceDetails(
+                  invoiceController: currentInvoiceDetailsController!,
+                );
+        },
       ),
     );
   }

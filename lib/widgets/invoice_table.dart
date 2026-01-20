@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/invoice_table_row.dart';
-import 'package:i_gen/repos/invoice_repo.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/utils/context_extensions.dart';
@@ -24,6 +25,7 @@ class InvoiceTable extends StatefulWidget {
 }
 
 class InvoiceTableState extends State<InvoiceTable> {
+  Timer? _debounce;
   late final List<TrinaColumn> columns;
   ({String? name, String currency}) selectedPriceCategory = (
     currency: 'USD',
@@ -284,6 +286,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                                   setState(() {
                                     discount = double.tryParse(value) ?? 0;
                                   });
+                                  widget.controller.discount = discount;
                                 },
                               ),
                             ),
@@ -382,6 +385,7 @@ class InvoiceTableState extends State<InvoiceTable> {
         title: '',
         field: 'price_category',
         width: 110,
+        hide: !widget.controller.editingIsEnabled,
         enableRowDrag: true,
         enableEditingMode: false,
         enableDropToResize: false,
@@ -453,12 +457,14 @@ class InvoiceTableState extends State<InvoiceTable> {
                         if (newValue == null) {
                           return;
                         }
+                        widget.controller.currency = newValue.currency;
                         setState(() {
                           selectedPriceCategory = newValue;
                         });
                         for (var row in stateManager.refRows) {
                           row.cells['price_category']!.value = newValue.name;
                         }
+                        _updateControllerLines();
                       },
                     ),
                   );
@@ -575,9 +581,7 @@ class InvoiceTableState extends State<InvoiceTable> {
         ),
         columns: columns,
         rows: [],
-        onChanged: (event) {
-          widget.controller.hasUnsavedChanges = true;
-        },
+        onChanged: (event) => _updateControllerLines(),
         onLoaded: (event) {
           stateManager = event.stateManager;
 
@@ -585,29 +589,42 @@ class InvoiceTableState extends State<InvoiceTable> {
             stateManager.columnFooterHeight = footerExpandedHeight;
           }
           widget.controller.enableEditingNotifier.addListener(() {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!context.isMobile) {
-                stateManager.hideColumn(
-                  columns.last,
-                  !widget.controller.editingIsEnabled,
-                );
-              }
-            });
+            stateManager.hideColumn(
+              columns.last,
+              !widget.controller.editingIsEnabled,
+            );
             if (widget.controller.editingIsEnabled) {
               onEnableEditing();
             } else {
-              onSave();
+              onDisableEditing();
             }
           });
-          stateManager.hideColumn(
-            columns.last,
-            !widget.controller.editingIsEnabled,
-          );
 
           stateManager.setShowColumnFilter(false);
         },
       ),
     );
+  }
+
+  void _updateControllerLines() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      widget.controller.hasUnsavedChanges = true;
+      final invoiceRows = <InvoiceTableRow>[];
+      for (var row in stateManager.refRows) {
+        if (row.cells['id']!.value case String model) {
+          invoiceRows.add(
+            InvoiceTableRow(
+              unitPrice: row.cells['unit_price']!.value,
+              product: products[model]!,
+              amount: row.cells['amount']!.value,
+            ),
+          );
+        }
+      }
+      widget.controller.invoiceLines = invoiceRows;
+      widget.controller.reCalculateTotal();
+    });
   }
 
   void onEnableEditing() {
@@ -619,37 +636,13 @@ class InvoiceTableState extends State<InvoiceTable> {
     }
   }
 
-  Future<void> onSave() async {
+  Future<void> onDisableEditing() async {
     if (discount <= 0) {
       stateManager.columnFooterHeight = stateManager.rowTotalHeight;
       setState(() {
         tableHeight -= heightToAddWhenFooterIsExpanded;
       });
     }
-    final invoiceRows = <InvoiceTableRow>[];
-    for (var row in stateManager.refRows) {
-      if (row.cells['id']!.value case String model) {
-        invoiceRows.add(
-          InvoiceTableRow(
-            unitPrice: row.cells['unit_price']!.value,
-            product: products[model]!,
-            amount: row.cells['amount']!.value,
-          ),
-        );
-      }
-    }
-    widget.controller.invoiceLines = invoiceRows;
-    final invoice = await GetIt.I.get<InvoiceRepo>().insert(
-      invoiceId: widget.controller.invoiceId,
-      currency: selectedPriceCategory.currency,
-      customerName: widget.controller.customerName,
-      date: widget.controller.invoiceDateNotifier.value,
-      discount: discount,
-      total: getTotal(stateManager),
-      lines: invoiceRows,
-    );
-    widget.controller.invoiceId = invoice.id;
-    widget.onSaved?.call(invoice);
   }
 
   double? _getModelPriceByCategory(String? model, String? pricingCategory) {

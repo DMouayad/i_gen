@@ -117,7 +117,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
               ),
               Expanded(
                 child: ListView.builder(
-                  padding: EdgeInsets.only(bottom: 80, left: 8, right: 8),
+                  padding: const EdgeInsets.all(8),
                   itemCount: _filteredProducts.length,
                   itemBuilder: (context, index) {
                     final product = _filteredProducts[index];
@@ -158,12 +158,14 @@ class ProductListItem extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 2.0),
+      color: context.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: Colors.grey.shade400, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(width: 0.5, color: context.colorScheme.outline),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Row(
           children: [
             Expanded(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:i_gen/utils/context_extensions.dart';
@@ -57,19 +59,16 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
 
   Map<String, Product> get _products =>
       GetIt.I.get<ProductsController>().products;
-  bool get _isEditing => widget.controller.editingIsEnabled;
-
+  Timer? _debounce;
   @override
   void initState() {
     super.initState();
     _initializeLines();
     _fetchPricingData();
-    widget.controller.enableEditingNotifier.addListener(_onEditingChanged);
   }
 
   @override
   void dispose() {
-    widget.controller.enableEditingNotifier.removeListener(_onEditingChanged);
     for (final line in _lines) {
       line.dispose();
     }
@@ -93,10 +92,6 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       _priceCategory = (currency: currency, name: null);
     }
     if (mounted) setState(() {});
-  }
-
-  void _onEditingChanged() {
-    if (!_isEditing) _saveLines();
   }
 
   InvoiceTableRow _createEmptyRow() => InvoiceTableRow(
@@ -140,6 +135,7 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       _lines[index].updatePrice(newPrice, _formatNumber);
       _markUnsaved();
     });
+    _saveLines();
   }
 
   void _updateAmount(int index, String value) {
@@ -148,6 +144,7 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       _lines[index].row = _lines[index].row.copyWith(amount: amount);
       _markUnsaved();
       setState(() {});
+      _saveLines();
     }
   }
 
@@ -157,23 +154,28 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       _lines[index].row = _lines[index].row.copyWith(unitPrice: price);
       _markUnsaved();
       setState(() {});
+      _saveLines();
     }
   }
 
   void _saveLines() {
-    // Sync controller values
-    for (final line in _lines) {
-      final amount = int.tryParse(line.amountController.text) ?? 0;
-      final price =
-          num.tryParse(line.priceController.text.replaceAll(',', '')) ?? 0;
-      line.row = line.row.copyWith(amount: amount, unitPrice: price);
-    }
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      // Sync controller values
+      for (final line in _lines) {
+        final amount = int.tryParse(line.amountController.text) ?? 0;
+        final price =
+            num.tryParse(line.priceController.text.replaceAll(',', '')) ?? 0;
+        line.row = line.row.copyWith(amount: amount, unitPrice: price);
+      }
 
-    widget.controller.invoiceLines = _lines
-        .where((l) => l.row.product.model.isNotEmpty && l.row.amount > 0)
-        .map((l) => l.row)
-        .toList();
-    widget.controller.hasUnsavedChanges = false;
+      widget.controller.invoiceLines = _lines
+          .where((l) => l.row.product.model.isNotEmpty && l.row.amount > 0)
+          .map((l) => l.row)
+          .toList();
+      widget.controller.hasUnsavedChanges = false;
+      widget.controller.reCalculateTotal();
+    });
   }
 
   void _markUnsaved() => widget.controller.hasUnsavedChanges = true;
@@ -203,6 +205,7 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
         }
       }
     });
+    _saveLines();
   }
 
   // ===== UI =====
@@ -214,11 +217,10 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
         _Header(
           lineCount: _lines.length,
           priceCategory: _priceCategory,
-          isEditing: _isEditing,
           onCategoryChanged: _onPriceCategoryChanged,
         ),
         _buildLinesList(),
-        if (_isEditing) _buildAddButton(),
+        _buildAddButton(),
       ],
     );
   }
@@ -235,7 +237,6 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
         lineData: _lines[index],
         products: _products,
         currency: _priceCategory.currency,
-        isEditing: _isEditing,
         formatNumber: _formatNumber,
         onRemove: () => _removeLine(index),
         onProductSelected: (name) => _updateProduct(index, name),
@@ -248,10 +249,13 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   Widget _buildAddButton() {
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: FilledButton.tonalIcon(
+      child: TextButton.icon(
         onPressed: _addLine,
         icon: const Icon(Icons.add),
-        label: const Text('Add Line'),
+        label: const Text(
+          'Add Line',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         style: FilledButton.styleFrom(
           minimumSize: const Size(double.infinity, 48),
         ),
@@ -266,13 +270,11 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.lineCount,
     required this.priceCategory,
-    required this.isEditing,
     required this.onCategoryChanged,
   });
 
   final int lineCount;
   final ({String currency, String? name}) priceCategory;
-  final bool isEditing;
   final ValueChanged<(String, String?)?> onCategoryChanged;
 
   @override
@@ -339,7 +341,7 @@ class _Header extends StatelessWidget {
                   ),
                 ),
               ],
-              onChanged: isEditing ? onCategoryChanged : null,
+              onChanged: onCategoryChanged,
             ),
           ),
         );
@@ -357,7 +359,6 @@ class _InvoiceLineCard extends StatelessWidget {
     required this.lineData,
     required this.products,
     required this.currency,
-    required this.isEditing,
     required this.formatNumber,
     required this.onRemove,
     required this.onProductSelected,
@@ -369,7 +370,6 @@ class _InvoiceLineCard extends StatelessWidget {
   final InvoiceLineData lineData;
   final Map<String, Product> products;
   final String currency;
-  final bool isEditing;
   final String Function(num) formatNumber;
   final VoidCallback onRemove;
   final ValueChanged<String> onProductSelected;
@@ -383,6 +383,7 @@ class _InvoiceLineCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: colors.outlineVariant.withOpacity(0.5)),
@@ -397,12 +398,11 @@ class _InvoiceLineCard extends StatelessWidget {
                 _LineNumber(index: index + 1),
                 const SizedBox(width: 12),
                 Expanded(child: _buildProductField()),
-                if (isEditing)
-                  IconButton(
-                    icon: Icon(Icons.delete_outline, color: colors.error),
-                    onPressed: onRemove,
-                    tooltip: 'Remove',
-                  ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, color: colors.error),
+                  onPressed: onRemove,
+                  tooltip: 'Remove',
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -412,6 +412,7 @@ class _InvoiceLineCard extends StatelessWidget {
                 Expanded(
                   flex: 2,
                   child: _buildTextField(
+                    context,
                     'Qty',
                     lineData.amountController,
                     onAmountChanged,
@@ -421,6 +422,7 @@ class _InvoiceLineCard extends StatelessWidget {
                 Expanded(
                   flex: 3,
                   child: _buildTextField(
+                    context,
                     'Price',
                     lineData.priceController,
                     onPriceChanged,
@@ -450,7 +452,6 @@ class _InvoiceLineCard extends StatelessWidget {
       builder: (context, controller, focusNode) => TextField(
         controller: controller,
         focusNode: focusNode,
-        enabled: isEditing,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         textDirection: TextDirection.rtl,
         decoration: InputDecoration(
@@ -498,6 +499,7 @@ class _InvoiceLineCard extends StatelessWidget {
   }
 
   Widget _buildTextField(
+    BuildContext context,
     String label,
     TextEditingController controller,
     ValueChanged<String> onChanged, {
@@ -505,14 +507,19 @@ class _InvoiceLineCard extends StatelessWidget {
   }) {
     return TextField(
       controller: controller,
-      readOnly: !isEditing,
       keyboardType: TextInputType.number,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
       decoration: InputDecoration(
         labelText: label,
         suffixText: suffix,
-
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(width: 1, color: context.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(width: 2, color: context.colorScheme.primary),
+          borderRadius: BorderRadius.circular(8),
+        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
@@ -569,17 +576,18 @@ class _TotalBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: colors.primaryContainer.withOpacity(0.3),
+        color: colors.primaryContainer.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Text('Total: '),
           Text(
             formatNumber(total),
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: colors.primary,
             ),

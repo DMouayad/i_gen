@@ -19,62 +19,59 @@ class InvoiceCustomerInfo extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 5.0, vertical: verticalPadding),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            width: double.infinity,
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(color: context.colorScheme.surfaceDim),
               ),
             ),
-            padding: EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 10),
             alignment: Alignment.center,
             child: Text('BILL TO', style: context.defaultTextStyle),
           ),
-          SizedBox(
-            width: double.infinity,
-            child: TypeAheadField<String>(
-              controller: controller.customerNameController,
-              itemBuilder: (context, value) => ListTile(
-                title: Text(
-                  value,
-                  style: context.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+          TypeAheadField<String>(
+            controller: controller.customerNameController,
+            itemBuilder: (context, value) => ListTile(
+              title: Text(
+                value,
+                style: context.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              tileColor: context.colorScheme.surface,
+            ),
+            onSelected: (value) {
+              controller.customerName = value;
+            },
+            builder: (context, textController, focusNode) {
+              return Form(
+                key: controller.formKey,
+                child: TextFormField(
+                  controller: textController,
+                  focusNode: focusNode,
+                  textAlign: TextAlign.center,
+                  onFieldSubmitted: (value) {
+                    controller.customerName = value;
+                  },
+
+                  style: context.defaultTextStyle.copyWith(fontSize: 22),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    hintText: 'Customer name',
                   ),
                 ),
-                tileColor: context.colorScheme.surface,
-              ),
-              onSelected: (value) {
-                controller.customerName = value;
-              },
-              builder: (context, textController, focusNode) {
-                return Form(
-                  key: controller.formKey,
-                  child: TextFormField(
-                    controller: textController,
-                    focusNode: focusNode,
-                    textAlign: TextAlign.center,
-                    onFieldSubmitted: (value) {
-                      controller.customerName = value;
-                    },
+              );
+            },
+            hideOnSelect: true,
+            hideOnEmpty: true,
 
-                    style: context.defaultTextStyle.copyWith(fontSize: 22),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide.none,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      hintText: 'Customer name',
-                    ),
-                  ),
-                );
-              },
-              hideOnSelect: true,
-              hideOnEmpty: true,
-
-              suggestionsCallback: (query) =>
-                  GetIt.I.get<CustomerRepo>().search(query),
-            ),
+            suggestionsCallback: (query) =>
+                GetIt.I.get<CustomerRepo>().search(query),
           ),
         ],
       ),
