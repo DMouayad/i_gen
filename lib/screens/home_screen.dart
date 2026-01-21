@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/screens/archive_screen.dart';
+import 'package:i_gen/screens/debug_screen.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';
 import 'package:i_gen/screens/products_screen_mobile.dart';
@@ -212,6 +213,11 @@ class _HomeState extends State<Home> {
                         selectedIcon: Icon(Icons.currency_exchange),
                         label: Text('Pricing'),
                       ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.bug_report_outlined),
+                        selectedIcon: Icon(Icons.bug_report),
+                        label: Text('Debugging'),
+                      ),
                     ],
                   ),
                 Flexible(
@@ -245,6 +251,7 @@ class _HomeState extends State<Home> {
                         unsavedProductPricingCountNotifier,
                         unsavedPricingCategoryCountNotifier,
                       ),
+                      3 => SyncDebugScreen(),
                       _ => const Center(child: Text('404')),
                     },
                   ),

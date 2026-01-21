@@ -1,4 +1,4 @@
-import 'package:i_gen/db.dart';
+import 'package:i_gen/db/db_constants.dart';
 import 'package:sqflite/sqflite.dart';
 
 class CustomerRepo {
