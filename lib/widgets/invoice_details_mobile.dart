@@ -104,24 +104,26 @@ class InvoiceDetailsMobile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: context.colorScheme.surfaceContainerHighest
-                          .withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    margin: const EdgeInsets.all(8.0),
-                    padding: const EdgeInsets.all(8.0),
-                    child: ValueListenableBuilder(
-                      valueListenable: controller.totalNotifier,
-                      builder: (context, value, _) {
-                        return Text(
-                          'Grand total: $value',
-                          style: context.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      },
+                  Flexible(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.surfaceContainerHighest
+                            .withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      margin: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.all(8.0),
+                      child: ValueListenableBuilder(
+                        valueListenable: controller.totalNotifier,
+                        builder: (context, value, _) {
+                          return Text(
+                            'Grand total: $value',
+                            style: context.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ],
