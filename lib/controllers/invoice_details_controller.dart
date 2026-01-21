@@ -61,7 +61,7 @@ class InvoiceDetailsController {
       enableEditing = false;
     }
     if (hasUnsavedChanges) {
-      final invoice = await GetIt.I.get<InvoiceRepo>().insert(
+      invoice = await GetIt.I.get<InvoiceRepo>().insert(
         invoiceId: invoiceId,
         currency: currency,
         customerName: customerName,
@@ -70,7 +70,7 @@ class InvoiceDetailsController {
         total: totalNotifier.value,
         lines: invoiceLines,
       );
-      invoiceId = invoice.id;
+      invoiceId = invoice?.id;
     }
     hasUnsavedChanges = false;
   }

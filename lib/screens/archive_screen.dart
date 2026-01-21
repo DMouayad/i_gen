@@ -110,9 +110,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                           widget.onLoaded(invoiceController);
                         },
                         onSaved: (newInvoice) {
-                          setState(() {
-                            invoices[index] = newInvoice;
-                          });
+                          setState(() => invoices[index] = newInvoice);
                         },
                         onDeleted: () {
                           setState(() {
@@ -160,7 +158,10 @@ class _Item extends StatelessWidget {
                 onInvoiceSelected(invoiceController);
                 invoiceController.enableEditing = true;
                 return context.isMobile
-                    ? InvoiceDetailsMobile(controller: invoiceController)
+                    ? InvoiceDetailsMobile(
+                        controller: invoiceController,
+                        onSaved: onSaved,
+                      )
                     : InvoiceDetails(
                         invoiceController: invoiceController,
                         onSaved: onSaved,

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/controllers/products_controller.dart';
-import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/invoice_table_row.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
@@ -17,9 +16,8 @@ import 'package:trina_grid/trina_grid.dart';
 const _defaultEmptyRowsCount = 10;
 
 class InvoiceTable extends StatefulWidget {
-  const InvoiceTable(this.controller, {super.key, this.onSaved});
+  const InvoiceTable(this.controller, {super.key});
   final InvoiceDetailsController controller;
-  final void Function(Invoice newInvoice)? onSaved;
   @override
   State<InvoiceTable> createState() => InvoiceTableState();
 }

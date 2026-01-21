@@ -4,6 +4,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get_it/get_it.dart';
 
 import 'package:i_gen/controllers/invoice_details_controller.dart';
+import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/repos/customer_repo.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
@@ -11,8 +12,13 @@ import 'package:i_gen/widgets/invoice_line_input_mobile.dart';
 import 'package:i_gen/widgets/prevent_pop.dart';
 
 class InvoiceDetailsMobile extends StatelessWidget {
-  const InvoiceDetailsMobile({super.key, required this.controller});
+  const InvoiceDetailsMobile({
+    super.key,
+    required this.controller,
+    this.onSaved,
+  });
   final InvoiceDetailsController controller;
+  final void Function(Invoice invoice)? onSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +32,12 @@ class InvoiceDetailsMobile extends StatelessWidget {
           title: controller.invoice == null ? const Text('New invoice') : null,
           actions: [
             TextButton.icon(
-              onPressed: () => controller.saveToDB(disableEditing: false),
+              onPressed: () async {
+                await controller.saveToDB(disableEditing: false);
+                if (controller.invoice != null) {
+                  onSaved?.call(controller.invoice!);
+                }
+              },
               icon: const Icon(Icons.save, size: 22),
               label: Text('Save', style: btnTextStyle),
             ),
@@ -97,8 +108,6 @@ class InvoiceDetailsMobile extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: context.colorScheme.surfaceContainerHighest
                           .withOpacity(0.4),
-
-                      // border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     margin: const EdgeInsets.all(8.0),

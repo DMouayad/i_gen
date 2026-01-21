@@ -151,7 +151,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                 const SizedBox(height: 10),
                 InvoiceCustomerInfo(widget.invoiceController),
                 const SizedBox(height: 10),
-                InvoiceTable(widget.invoiceController, onSaved: widget.onSaved),
+                InvoiceTable(widget.invoiceController),
                 const SizedBox(height: 50),
               ],
             ),
@@ -180,12 +180,6 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
         builder: (context, editingEnabled, _) {
           return Scaffold(
             appBar: AppBar(
-              // leadingWidth: 100,
-              // leading: TextButton.icon(
-              //   onPressed: () => Navigator.maybePop(context),
-              //   icon: const Icon(Icons.arrow_back),
-              //   label: Text('Back', style: context.textTheme.titleMedium),
-              // ),
               actions: [
                 SizedBox(
                   width: context.width * .8,
@@ -193,8 +187,13 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                     firstChild: Container(
                       alignment: AlignmentDirectional.centerEnd,
                       child: FilledButton.icon(
-                        onPressed: () {
-                          widget.invoiceController.saveToDB();
+                        onPressed: () async {
+                          await widget.invoiceController.saveToDB();
+                          if (widget.invoiceController.invoice != null) {
+                            widget.onSaved?.call(
+                              widget.invoiceController.invoice!,
+                            );
+                          }
                         },
                         label: const Text('Save'),
                         icon: const Icon(Icons.save),
