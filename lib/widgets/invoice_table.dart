@@ -10,7 +10,7 @@ import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/futuristic.dart';
 import 'package:i_gen/widgets/trina_drop_down_renderer.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:trina_grid/trina_grid.dart';
 
 const _defaultEmptyRowsCount = 10;
@@ -103,10 +103,8 @@ class InvoiceTableState extends State<InvoiceTable> {
 
   NumberFormat getNumberFormat() {
     return NumberFormat.currency(
-      decimalDigits: selectedPriceCategory.currency == 'USD' ? 2 : 0,
-
-      symbol: selectedPriceCategory.currency == 'SP' ? 'ل.س' : '\$',
-
+      decimalDigits: selectedPriceCategory.currency == 'USD' ? 1 : 0,
+      symbol: selectedPriceCategory.currency == 'SP' ? ' ل.س' : '\$ ',
       locale: selectedPriceCategory.currency == 'SP' ? 'ar' : 'en',
     );
   }
@@ -334,8 +332,12 @@ class InvoiceTableState extends State<InvoiceTable> {
                   rendererContext: rendererContext,
                   type: TrinaAggregateColumnType.sum,
                   alignment: Alignment.center,
-                  numberFormat: getNumberFormat(),
+                  numberFormat: NumberFormat.decimalPatternDigits(
+                    locale: getNumberFormat().locale,
+                    decimalDigits: getNumberFormat().decimalDigits,
+                  ),
                   titleSpanBuilder: (sumValue) {
+                    final numberFormat = getNumberFormat();
                     return [
                       WidgetSpan(
                         child: Column(
@@ -343,16 +345,20 @@ class InvoiceTableState extends State<InvoiceTable> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              sumValue,
+                              '$sumValue ${numberFormat.currencySymbol}',
                               style: textStyle.copyWith(
                                 fontSize: textStyle.fontSize! + 1,
                               ),
+                              textDirection: numberFormat.locale == 'en'
+                                  ? TextDirection.rtl
+                                  : TextDirection.rtl,
+                              // locale: Locale(numberFormat.locale),
                             ),
                             if (discount > 0 ||
                                 widget.controller.editingIsEnabled) ...[
                               SizedBox(height: 10),
                               Text(
-                                '- ${getNumberFormat().format(discount)}',
+                                '- ${numberFormat.format(discount)}',
                                 style: textStyle.copyWith(
                                   fontSize: textStyle.fontSize! + 1,
                                 ),
@@ -360,7 +366,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                               ),
                               SizedBox(height: 10),
                               Text(
-                                getNumberFormat().format(
+                                numberFormat.format(
                                   getTotalWithDiscount(rendererContext),
                                 ),
                                 style: textStyle.copyWith(
@@ -382,12 +388,13 @@ class InvoiceTableState extends State<InvoiceTable> {
       TrinaColumn(
         title: '',
         field: 'price_category',
-        width: 110,
+        width: 200,
         hide: !widget.controller.editingIsEnabled,
         enableRowDrag: true,
         enableEditingMode: false,
         enableDropToResize: false,
         enableContextMenu: false,
+        enableColumnDrag: false,
         frozen: TrinaColumnFrozen.end,
         footerRenderer: (context) {
           return IconButton.filled(
@@ -413,12 +420,13 @@ class InvoiceTableState extends State<InvoiceTable> {
           );
         },
         titleRenderer: (rendererContext) {
-          return Container(
-            width: 100,
-            height: 55,
-            alignment: Alignment.center,
+          final style = textStyle.copyWith(fontSize: 18);
+          return SizedBox(
+            width: 200,
+            height: 60,
             child: FittedBox(
-              fit: BoxFit.contain,
+              fit: BoxFit.fill,
+              alignment: Alignment.center,
               child: Futuristic(
                 autoStart: true,
                 key: Key('priceCategoryDropdown'),
@@ -427,26 +435,29 @@ class InvoiceTableState extends State<InvoiceTable> {
                 dataBuilder: (context, categories) {
                   return DropdownButtonHideUnderline(
                     child: DropdownButton(
-                      isDense: true,
-                      iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      icon: const SizedBox.shrink(),
                       value: selectedPriceCategory,
-                      style: textStyle,
-                      hint: Text('Select price list'),
+                      style: style,
+                      hint: const Text('Select price list'),
                       items: [
-                        DropdownMenuItem(
+                        const DropdownMenuItem(
                           value: (currency: 'SP', name: null),
-                          child: Text('Custom ل.س'),
+                          child: Text(
+                            'Custom ل.س',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        DropdownMenuItem(
+                        const DropdownMenuItem(
                           value: (currency: 'USD', name: null),
-                          child: Text('Custom \$(USD)'),
+                          child: Text('Custom \$', textAlign: TextAlign.center),
                         ),
                         ...categories.map(
                           (e) => DropdownMenuItem(
                             value: (currency: e.currency, name: e.name),
                             child: Text(
                               '${e.name} (${e.currency})',
-                              style: textStyle,
+                              style: style,
                             ),
                           ),
                         ),
@@ -471,14 +482,18 @@ class InvoiceTableState extends State<InvoiceTable> {
             ),
           );
         },
-        renderer: (rendererContext) => IconButton(
-          icon: Icon(Icons.remove_circle_outline),
-          onPressed: () {
-            rendererContext.stateManager.removeRows([rendererContext.row]);
-            setState(() {
-              tableHeight -= tableRowHeight;
-            });
-          },
+        renderer: (rendererContext) => SizedBox(
+          width: 55,
+          child: IconButton(
+            icon: const Icon(Icons.remove_circle_outline),
+            alignment: AlignmentDirectional.centerEnd,
+            onPressed: () {
+              rendererContext.stateManager.removeRows([rendererContext.row]);
+              setState(() {
+                tableHeight -= tableRowHeight;
+              });
+            },
+          ),
         ),
         type: TrinaColumnType.text(),
       ),
@@ -587,11 +602,9 @@ class InvoiceTableState extends State<InvoiceTable> {
             stateManager.columnFooterHeight = footerExpandedHeight;
           }
           widget.controller.enableEditingNotifier.addListener(() {
-            stateManager.hideColumn(
-              columns.last,
-              !widget.controller.editingIsEnabled,
-            );
-            if (widget.controller.editingIsEnabled) {
+            final isEditing = widget.controller.editingIsEnabled;
+            stateManager.hideColumn(columns.last, !isEditing);
+            if (isEditing) {
               onEnableEditing();
             } else {
               onDisableEditing();
