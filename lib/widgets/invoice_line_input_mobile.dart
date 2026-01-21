@@ -183,7 +183,6 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
           .where((l) => l.row.product.model.isNotEmpty && l.row.amount > 0)
           .map((l) => l.row)
           .toList();
-      widget.controller.hasUnsavedChanges = false;
       widget.controller.reCalculateTotal();
     });
   }
