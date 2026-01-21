@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -325,6 +326,9 @@ class _Header extends StatelessWidget {
             child: DropdownButton<(String, String?)>(
               isDense: true,
               value: (priceCategory.currency, priceCategory.name),
+              style: context.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
               items: [
                 const DropdownMenuItem(
                   value: ('SP', null),
@@ -509,6 +513,7 @@ class _InvoiceLineCard extends StatelessWidget {
       controller: controller,
       keyboardType: TextInputType.number,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: InputDecoration(
         labelText: label,
         suffixText: suffix,
