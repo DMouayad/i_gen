@@ -52,6 +52,7 @@ class InvoiceLineInputMobile extends StatefulWidget {
 
 class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   final List<InvoiceLineData> _lines = [];
+  late final TextEditingController discountController;
   ProductsPricing? _productsPricing;
   ({String currency, String? name}) _priceCategory = (
     currency: 'USD',
@@ -64,6 +65,9 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   @override
   void initState() {
     super.initState();
+    discountController = TextEditingController(
+      text: widget.controller.discount.toString(),
+    );
     _initializeLines();
     _fetchPricingData();
   }
@@ -73,6 +77,7 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
     for (final line in _lines) {
       line.dispose();
     }
+    discountController.dispose();
     super.dispose();
   }
 
@@ -159,6 +164,10 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
     }
   }
 
+  void _updateDiscount(String discount) {
+    widget.controller.discount = num.tryParse(discount)?.toDouble() ?? 0;
+  }
+
   void _saveLines() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
@@ -220,9 +229,36 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
           priceCategory: _priceCategory,
           onCategoryChanged: _onPriceCategoryChanged,
         ),
+        _buildDiscount(),
         _buildLinesList(),
         _buildAddButton(),
       ],
+    );
+  }
+
+  Widget _buildDiscount() {
+    return Container(
+      margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: context.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        spacing: 4,
+        children: [
+          Icon(Icons.discount_outlined, color: Colors.redAccent),
+          Text('Discount: '),
+
+          Flexible(
+            child: _CustomTextField(
+              label: 'Discount',
+              controller: discountController,
+              onChanged: _updateDiscount,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -415,21 +451,19 @@ class _InvoiceLineCard extends StatelessWidget {
               children: [
                 Expanded(
                   flex: 2,
-                  child: _buildTextField(
-                    context,
-                    'Qty',
-                    lineData.amountController,
-                    onAmountChanged,
+                  child: _CustomTextField(
+                    label: 'Qty',
+                    controller: lineData.amountController,
+                    onChanged: onAmountChanged,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 3,
-                  child: _buildTextField(
-                    context,
-                    'Price',
-                    lineData.priceController,
-                    onPriceChanged,
+                  child: _CustomTextField(
+                    label: 'Price',
+                    controller: lineData.priceController,
+                    onChanged: onPriceChanged,
                     suffix: currency,
                   ),
                 ),
@@ -501,14 +535,23 @@ class _InvoiceLineCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildTextField(
-    BuildContext context,
-    String label,
-    TextEditingController controller,
-    ValueChanged<String> onChanged, {
-    String? suffix,
-  }) {
+class _CustomTextField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final String? suffix;
+  const _CustomTextField({
+    required this.label,
+    required this.controller,
+    required this.onChanged,
+    this.suffix,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
