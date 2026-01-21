@@ -20,6 +20,13 @@ class InvoiceDetailsMobile extends StatelessWidget {
   final InvoiceDetailsController controller;
   final void Function(Invoice invoice)? onSaved;
 
+  Future<void> _onSave() async {
+    await controller.saveToDB(disableEditing: false);
+    if (controller.invoice != null) {
+      onSaved?.call(controller.invoice!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final btnTextStyle = context.textTheme.titleMedium?.copyWith(
@@ -32,18 +39,13 @@ class InvoiceDetailsMobile extends StatelessWidget {
           title: controller.invoice == null ? const Text('New invoice') : null,
           actions: [
             TextButton.icon(
-              onPressed: () async {
-                await controller.saveToDB(disableEditing: false);
-                if (controller.invoice != null) {
-                  onSaved?.call(controller.invoice!);
-                }
-              },
+              onPressed: _onSave,
               icon: const Icon(Icons.save, size: 22),
               label: Text('Save', style: btnTextStyle),
             ),
             TextButton.icon(
               onPressed: () {
-                controller.saveToDB();
+                _onSave();
                 Navigator.push(
                   context,
                   MaterialPageRoute(
