@@ -169,7 +169,7 @@ class InvoiceTableState extends State<InvoiceTable> {
           return Container(
             alignment: Alignment.centerLeft,
             decoration: BoxDecoration(
-              border: Border(right: BorderSide(color: Colors.black26)),
+              border: const Border(right: BorderSide(color: Colors.black26)),
             ),
             child: Text(
               'Thank you for your business'.toUpperCase(),
@@ -247,7 +247,7 @@ class InvoiceTableState extends State<InvoiceTable> {
         ),
         footerRenderer: (_) {
           return Container(
-            padding: EdgeInsets.only(left: 10),
+            padding: const EdgeInsets.only(left: 10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -256,7 +256,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                   style: textStyle.copyWith(fontSize: 16),
                 ),
                 if (discount > 0 || widget.controller.editingIsEnabled) ...[
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   TextButton(
                     onPressed: () {
                       showDialog(
@@ -282,7 +282,8 @@ class InvoiceTableState extends State<InvoiceTable> {
                                   setState(() {
                                     discount = double.tryParse(value) ?? 0;
                                   });
-                                  widget.controller.discount = discount;
+                                  widget.controller.discountNotifier.value =
+                                      discount;
                                 },
                               ),
                             ),
@@ -298,7 +299,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Text('TOTAL', style: textStyle.copyWith(fontSize: 16)),
                 ],
               ],
@@ -352,7 +353,6 @@ class InvoiceTableState extends State<InvoiceTable> {
                               textDirection: numberFormat.locale == 'en'
                                   ? TextDirection.rtl
                                   : TextDirection.rtl,
-                              // locale: Locale(numberFormat.locale),
                             ),
                             if (discount > 0 ||
                                 widget.controller.editingIsEnabled) ...[
@@ -364,7 +364,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                                 ),
                                 textAlign: TextAlign.start,
                               ),
-                              SizedBox(height: 10),
+                              const SizedBox(height: 10),
                               Text(
                                 numberFormat.format(
                                   getTotalWithDiscount(rendererContext),
@@ -416,7 +416,7 @@ class InvoiceTableState extends State<InvoiceTable> {
 
               stateManager.setHoveredRowIdx(newLastRow.sortIdx);
             },
-            icon: Icon(Icons.add),
+            icon: const Icon(Icons.add),
           );
         },
         titleRenderer: (rendererContext) {
@@ -429,7 +429,7 @@ class InvoiceTableState extends State<InvoiceTable> {
               alignment: Alignment.center,
               child: Futuristic(
                 autoStart: true,
-                key: Key('priceCategoryDropdown'),
+                key: const Key('priceCategoryDropdown'),
                 futureBuilder: () =>
                     GetIt.I.get<PricingCategoryRepo>().getAll(),
                 dataBuilder: (context, categories) {

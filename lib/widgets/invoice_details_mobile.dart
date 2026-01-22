@@ -13,8 +13,8 @@ import 'package:i_gen/widgets/prevent_pop.dart';
 
 class InvoiceDetailsMobile extends StatelessWidget {
   const InvoiceDetailsMobile({
-    super.key,
     required this.controller,
+    super.key,
     this.onSaved,
   });
   final InvoiceDetailsController controller;
@@ -116,13 +116,18 @@ class InvoiceDetailsMobile extends StatelessWidget {
                       margin: const EdgeInsets.all(8.0),
                       padding: const EdgeInsets.all(8.0),
                       child: ValueListenableBuilder(
-                        valueListenable: controller.totalNotifier,
-                        builder: (context, value, _) {
-                          return Text(
-                            'Grand total: $value',
-                            style: context.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        valueListenable: controller.discountNotifier,
+                        builder: (context, discount, child) {
+                          return ValueListenableBuilder(
+                            valueListenable: controller.totalNotifier,
+                            builder: (context, total, _) {
+                              return Text(
+                                'Grand total: ${total - discount}',
+                                style: context.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

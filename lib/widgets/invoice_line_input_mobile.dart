@@ -15,7 +15,6 @@ import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/utils/futuristic.dart';
 
-/// Encapsulates invoice line data with its controllers
 class InvoiceLineData {
   final TextEditingController productController;
   final TextEditingController amountController;
@@ -52,7 +51,6 @@ class InvoiceLineInputMobile extends StatefulWidget {
 
 class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   final List<InvoiceLineData> _lines = [];
-  late final TextEditingController discountController;
   ProductsPricing? _productsPricing;
   ({String currency, String? name}) _priceCategory = (
     currency: 'USD',
@@ -65,9 +63,6 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   @override
   void initState() {
     super.initState();
-    discountController = TextEditingController(
-      text: widget.controller.discount.toString(),
-    );
     _initializeLines();
     _fetchPricingData();
   }
@@ -77,7 +72,6 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
     for (final line in _lines) {
       line.dispose();
     }
-    discountController.dispose();
     super.dispose();
   }
 
@@ -165,7 +159,8 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   }
 
   void _updateDiscount(String discount) {
-    widget.controller.discount = num.tryParse(discount)?.toDouble() ?? 0;
+    widget.controller.discountNotifier.value =
+        num.tryParse(discount)?.toDouble() ?? 0;
   }
 
   void _saveLines() {
@@ -246,14 +241,14 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       child: Row(
         spacing: 4,
         children: [
-          Icon(Icons.discount_outlined, color: Colors.redAccent),
-          Text('Discount: '),
+          const Icon(Icons.discount_outlined, color: Colors.redAccent),
+          const Text('Discount: '),
 
           Flexible(
             child: _CustomTextField(
               label: 'Discount',
-              controller: discountController,
               onChanged: _updateDiscount,
+              initialValue: widget.controller.discount.toString(),
             ),
           ),
         ],
@@ -431,7 +426,6 @@ class _InvoiceLineCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            // Row 1: Line number + Product + Delete
             Row(
               children: [
                 _LineNumber(index: index + 1),
@@ -445,7 +439,6 @@ class _InvoiceLineCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Row 2: Qty + Price + Total
             Row(
               children: [
                 Expanded(
@@ -506,7 +499,6 @@ class _InvoiceLineCard extends StatelessWidget {
         onProductSelected(value);
         lineData.productController.text = value;
       },
-
       itemBuilder: (context, name) {
         final product = products.values.firstWhere(
           (p) => p.name == name,
@@ -538,21 +530,24 @@ class _InvoiceLineCard extends StatelessWidget {
 
 class _CustomTextField extends StatelessWidget {
   final String label;
-  final TextEditingController controller;
+  final TextEditingController? controller;
   final ValueChanged<String> onChanged;
   final String? suffix;
+  final String? initialValue;
+
   const _CustomTextField({
     required this.label,
-    required this.controller,
     required this.onChanged,
+    this.controller,
+    this.initialValue,
     this.suffix,
-    super.key,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
+      initialValue: initialValue,
       keyboardType: TextInputType.number,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -630,7 +625,7 @@ class _TotalBadge extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Total: '),
+          const Text('Total: '),
           Text(
             formatNumber(total),
             style: TextStyle(

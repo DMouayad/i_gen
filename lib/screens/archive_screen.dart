@@ -58,12 +58,12 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
               child: OverflowBar(
                 alignment: MainAxisAlignment.start,
                 children: [
-                  Text('SORT'),
-                  SizedBox(width: 10),
+                  const Text('SORT'),
+                  const SizedBox(width: 10),
                   DropdownButton<OrderBy?>(
                     value: orderBy,
-                    hint: Text('Sort'),
-                    items: [
+                    hint: const Text('Sort'),
+                    items: const [
                       DropdownMenuItem(
                         value: OrderBy('customer', true),
                         child: Text('From A-Z'),
@@ -94,16 +94,17 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
             ),
 
             (isLoading)
-                ? CircularProgressIndicator()
+                ? const CircularProgressIndicator()
                 : invoices.isEmpty
-                ? Text('No invoices found')
+                ? const Text('No invoices found')
                 : Container(
-                    padding: EdgeInsets.symmetric(vertical: 50),
+                    padding: const EdgeInsets.symmetric(vertical: 50),
                     height: context.height,
                     width: 1000,
                     child: ListView.separated(
                       itemCount: invoices.length,
-                      separatorBuilder: (context, index) => SizedBox(height: 5),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 5),
                       itemBuilder: (context, index) => _Item(
                         invoice: invoices[index],
                         onInvoiceSelected: (invoiceController) {
@@ -149,7 +150,7 @@ class _Item extends StatelessWidget {
           side: BorderSide(color: context.colorScheme.surfaceDim),
           borderRadius: BorderRadius.circular(4),
         ),
-        contentPadding: EdgeInsets.symmetric(vertical: 7, horizontal: 20),
+        contentPadding: const EdgeInsets.symmetric(vertical: 7, horizontal: 20),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -193,7 +194,10 @@ class _Item extends StatelessWidget {
                   await GetIt.I.get<InvoiceRepo>().delete(invoice);
                   onDeleted();
                 },
-                label: Text('Delete', style: TextStyle(color: Colors.red)),
+                label: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),

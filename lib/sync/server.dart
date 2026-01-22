@@ -136,28 +136,27 @@ class SyncServer {
   /// Handle POST /sync
   Future<Response> _handleSync(Request request) async {
     try {
-      // Parse request body
+      print('📥 Received sync request');
+
       final body = await request.readAsString();
       final json = jsonDecode(body) as Map<String, dynamic>;
       final payload = SyncPayload.fromJson(json);
 
-      // Log incoming sync
       final itemCount =
           payload.products.length +
           payload.invoices.length +
           payload.priceCategories.length +
           payload.prices.length;
 
-      debugPrint(
+      print(
         '📥 Receiving sync from ${payload.sourceDeviceName}: $itemCount items',
       );
 
-      // Merge the data
       final result = await _syncService.mergePayload(payload);
 
-      debugPrint('✅ Sync complete: $result');
+      print('✅ Sync complete: $result');
 
-      // Update state with result
+      // Update state but keep server running
       _updateState(
         ServerState(
           status: ServerStatus.running,
@@ -167,7 +166,6 @@ class SyncServer {
         ),
       );
 
-      // Return success with result summary
       return Response.ok(
         jsonEncode({
           'success': true,
@@ -181,8 +179,10 @@ class SyncServer {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      debugPrint('❌ Sync error: $e');
-      debugPrint(stack.toString());
+      print('❌ Sync error: $e');
+      print(stack);
+
+      // Don't change server state on error - keep running
       return Response.internalServerError(
         body: jsonEncode({'error': e.toString()}),
         headers: {'Content-Type': 'application/json'},

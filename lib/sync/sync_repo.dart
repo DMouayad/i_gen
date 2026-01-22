@@ -410,6 +410,9 @@ class SyncRepository {
   Future<SyncResult> mergePayload(SyncPayload payload) async {
     var result = const SyncResult();
 
+    // Calculate max updated_at from all incoming data
+    final maxUpdatedAt = _calculateMaxUpdatedAt(payload);
+
     return await db.transaction((txn) async {
       // Order matters: products before invoices (FK dependency)
       result = result + await _mergeProducts(txn, payload.products);
@@ -419,18 +422,86 @@ class SyncRepository {
       result = result + await _mergeInvoices(txn, payload.invoices);
       result = result + await _applyTombstones(txn, payload.tombstones);
 
-      // Update sync history
+      // Update sync history with the MAX updated_at from received data
       await _updateSyncHistory(
         txn,
         payload.sourceDeviceId,
         payload.sourceDeviceName,
+        maxUpdatedAt,
       );
 
       return result;
     });
   }
 
-  // lib/sync/sync_repository.dart
+  /// Calculate the maximum updated_at timestamp from payload
+  int _calculateMaxUpdatedAt(SyncPayload payload) {
+    int maxUpdatedAt = 0;
+
+    // Check products
+    for (final item in payload.products) {
+      final updatedAt = _extractUpdatedAt(item);
+      if (updatedAt > maxUpdatedAt) maxUpdatedAt = updatedAt;
+    }
+
+    // Check price categories
+    for (final item in payload.priceCategories) {
+      final updatedAt = _extractUpdatedAt(item);
+      if (updatedAt > maxUpdatedAt) maxUpdatedAt = updatedAt;
+    }
+
+    // Check prices
+    for (final item in payload.prices) {
+      final updatedAt = _extractUpdatedAt(item);
+      if (updatedAt > maxUpdatedAt) maxUpdatedAt = updatedAt;
+    }
+
+    // Check invoices
+    for (final item in payload.invoices) {
+      final updatedAt = _extractUpdatedAt(item);
+      if (updatedAt > maxUpdatedAt) maxUpdatedAt = updatedAt;
+
+      // Also check invoice lines
+      final lines = item['lines'] as List<dynamic>? ?? [];
+      for (final line in lines) {
+        final lineUpdatedAt = _extractUpdatedAt(line as Map<String, dynamic>);
+        if (lineUpdatedAt > maxUpdatedAt) maxUpdatedAt = lineUpdatedAt;
+      }
+    }
+
+    // Check tombstones
+    for (final tombstone in payload.tombstones) {
+      if (tombstone.deletedAt > maxUpdatedAt)
+        maxUpdatedAt = tombstone.deletedAt;
+    }
+
+    // Fallback to payload timestamp if no data
+    if (maxUpdatedAt == 0) {
+      maxUpdatedAt = payload.timestamp;
+    }
+
+    return maxUpdatedAt;
+  }
+
+  /// Extract updated_at from a map, handling different key formats
+  int _extractUpdatedAt(Map<String, dynamic> item) {
+    return (item['updated_at'] ?? item[DbConstants.columnUpdatedAt] ?? 0)
+        as int;
+  }
+
+  /// Update sync history with the anchor timestamp
+  Future<void> _updateSyncHistory(
+    Transaction txn,
+    String deviceId,
+    String deviceName,
+    int anchor,
+  ) async {
+    await txn.insert(DbConstants.tableSyncHistory, {
+      'device_id': deviceId,
+      'device_name': deviceName,
+      'last_sync_at': anchor,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 
   Future<SyncResult> _mergeProducts(
     Transaction txn,
@@ -951,18 +1022,18 @@ class SyncRepository {
   //   return result.isNotEmpty ? result.first[DbConstants.columnId] as int : null;
   // }
 
-  Future<void> _updateSyncHistory(
-    Transaction txn,
-    String deviceId,
-    String deviceName,
-  ) async {
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    await txn.insert(DbConstants.tableSyncHistory, {
-      'device_id': deviceId,
-      'device_name': deviceName,
-      'last_sync_at': now,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
+  // Future<void> _updateSyncHistory(
+  //   Transaction txn,
+  //   String deviceId,
+  //   String deviceName,
+  // ) async {
+  //   final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+  //   await txn.insert(DbConstants.tableSyncHistory, {
+  //     'device_id': deviceId,
+  //     'device_name': deviceName,
+  //     'last_sync_at': now,
+  //   }, conflictAlgorithm: ConflictAlgorithm.replace);
+  // }
 
   // ==================== TOMBSTONES ====================
 

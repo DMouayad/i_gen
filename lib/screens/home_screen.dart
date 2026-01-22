@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:i_gen/controllers/invoice_details_controller.dart';
@@ -101,6 +102,7 @@ class _HomeState extends State<Home> {
     unsavedProductCountNotifier.dispose();
     unsavedPricingCategoryCountNotifier.dispose();
     navigationConfirmedStreamController.close();
+
     super.dispose();
   }
 
@@ -132,23 +134,6 @@ class _HomeState extends State<Home> {
       listenable: navListener!,
       builder: (context, _) {
         return Scaffold(
-          appBar: (navListener!.value == 0 && context.isMobile)
-              ? AppBar(
-                  actions: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SyncScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.sync_alt),
-                    ),
-                  ],
-                )
-              : null,
           floatingActionButton: !context.isMobile || navListener!.value != 0
               ? null
               : FloatingActionButton(
@@ -158,6 +143,7 @@ class _HomeState extends State<Home> {
           bottomNavigationBar: context.showNavigationRail
               ? null
               : BottomNavigationBar(
+                  type: BottomNavigationBarType.fixed,
                   currentIndex: navListener!.value,
                   items: const [
                     BottomNavigationBarItem(
@@ -171,6 +157,10 @@ class _HomeState extends State<Home> {
                     BottomNavigationBarItem(
                       icon: Icon(Icons.currency_exchange),
                       label: 'Pricing',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.sync_alt),
+                      label: 'Sync',
                     ),
                   ],
                   onTap: navListener!.updateIndex,
@@ -189,7 +179,6 @@ class _HomeState extends State<Home> {
                     extended: true,
                     onDestinationSelected: navListener!.updateIndex,
                     useIndicator: true,
-
                     trailing: Padding(
                       padding: const EdgeInsets.only(top: 24.0),
                       child: FilledButton.icon(
@@ -236,11 +225,12 @@ class _HomeState extends State<Home> {
                         selectedIcon: Icon(Icons.sync_alt),
                         label: Text('Sync'),
                       ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.bug_report),
-                        selectedIcon: Icon(Icons.bug_report),
-                        label: Text('debug'),
-                      ),
+                      if (kDebugMode)
+                        NavigationRailDestination(
+                          icon: Icon(Icons.bug_report),
+                          selectedIcon: Icon(Icons.bug_report),
+                          label: Text('debug'),
+                        ),
                     ],
                   ),
                 Flexible(
@@ -255,9 +245,9 @@ class _HomeState extends State<Home> {
                     child: switch (navListener!.value) {
                       0 => Center(
                         child: ArchiveScreen(
-                          onLoaded: (invoiceController) =>
-                              currentInvoiceDetailsController =
-                                  invoiceController,
+                          onLoaded: (invoiceController) {
+                            currentInvoiceDetailsController = invoiceController;
+                          },
                         ),
                       ),
                       1 =>
@@ -274,8 +264,8 @@ class _HomeState extends State<Home> {
                         unsavedProductPricingCountNotifier,
                         unsavedPricingCategoryCountNotifier,
                       ),
-                      3 => SyncScreen(),
-                      4 => SyncDebugScreen(),
+                      3 => const SyncScreen(),
+                      4 => const SyncDebugScreen(),
                       _ => const Center(child: Text('404')),
                     },
                   ),

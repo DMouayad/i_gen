@@ -702,8 +702,8 @@ class _StatusCard extends StatelessWidget {
       ),
       ClientStatus.success => (
         Icons.check_circle,
-        colors.primary,
-        colors.primaryContainer,
+        Colors.green,
+        Colors.green.withOpacity(0.1),
       ),
       ClientStatus.error => (Icons.error, colors.error, colors.errorContainer),
     };
@@ -730,9 +730,27 @@ class _StatusCard extends StatelessWidget {
             Icon(icon, color: color),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              state.message.isEmpty ? 'Ready to sync' : state.message,
-              style: TextStyle(color: color),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.message.isEmpty ? 'Ready to sync' : state.message,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w500),
+                ),
+                if (state.status == ClientStatus.success &&
+                    state.result != null &&
+                    state.result!.inserted == 0 &&
+                    state.result!.updated == 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap sync again after making changes',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

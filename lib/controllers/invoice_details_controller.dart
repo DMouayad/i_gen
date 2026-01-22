@@ -11,12 +11,15 @@ class InvoiceDetailsController {
         text: invoice?.customerName,
       ),
       currency = invoice?.currency ?? 'USD',
-      discount = invoice?.discount ?? 0,
       _enableEditing = ValueNotifier(invoice == null),
       invoiceId = invoice?.id,
       invoiceLines =
           invoice?.lines.map(InvoiceTableRow.fromInvoiceLine).toList() ?? [] {
     totalNotifier = ValueNotifier(_getTotal());
+    discountNotifier = ValueNotifier(invoice?.discount ?? 0)
+      ..addListener(() {
+        hasUnsavedChangesNotifier.value = discount != invoice?.discount;
+      });
   }
 
   final ValueNotifier<int> textSizeNotifier = ValueNotifier(20);
@@ -30,12 +33,13 @@ class InvoiceDetailsController {
   List<InvoiceTableRow> invoiceLines;
   final ValueNotifier<bool> _enableEditing;
   late final ValueNotifier<double> totalNotifier;
+  late final ValueNotifier<double> discountNotifier;
   double get total => totalNotifier.value;
   final ValueNotifier<bool> _hasUnsavedChanges = ValueNotifier(false);
   ValueNotifier<bool> get hasUnsavedChangesNotifier => _hasUnsavedChanges;
 
   bool get hasUnsavedChanges => _hasUnsavedChanges.value;
-  double discount = 0;
+  double get discount => discountNotifier.value;
   set hasUnsavedChanges(bool value) => _hasUnsavedChanges.value = value;
 
   ValueNotifier<DateTime> get invoiceDateNotifier => _invoiceDate;
