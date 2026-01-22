@@ -14,7 +14,6 @@ import 'package:sqflite/sqflite.dart' show Database;
 Future<void> injectDependencies() async {
   // open DB connection
   final db = await DbProvider.open();
-  await DbSeeder.seedProducts(db);
   GetIt.I.registerSingleton<Database>(db);
   final productRepo = ProductRepo(db);
   GetIt.I.registerSingleton(productRepo);

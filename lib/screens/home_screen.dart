@@ -8,6 +8,7 @@ import 'package:i_gen/screens/debug_screen.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';
 import 'package:i_gen/screens/products_screen_mobile.dart';
+import 'package:i_gen/screens/sync_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
@@ -131,6 +132,23 @@ class _HomeState extends State<Home> {
       listenable: navListener!,
       builder: (context, _) {
         return Scaffold(
+          appBar: (navListener!.value == 0 && context.isMobile)
+              ? AppBar(
+                  actions: [
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SyncScreen(),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.sync_alt),
+                    ),
+                  ],
+                )
+              : null,
           floatingActionButton: !context.isMobile || navListener!.value != 0
               ? null
               : FloatingActionButton(
@@ -214,9 +232,14 @@ class _HomeState extends State<Home> {
                         label: Text('Pricing'),
                       ),
                       NavigationRailDestination(
-                        icon: Icon(Icons.bug_report_outlined),
+                        icon: Icon(Icons.sync_alt_outlined),
+                        selectedIcon: Icon(Icons.sync_alt),
+                        label: Text('Sync'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.bug_report),
                         selectedIcon: Icon(Icons.bug_report),
-                        label: Text('Debugging'),
+                        label: Text('debug'),
                       ),
                     ],
                   ),
@@ -251,7 +274,8 @@ class _HomeState extends State<Home> {
                         unsavedProductPricingCountNotifier,
                         unsavedPricingCategoryCountNotifier,
                       ),
-                      3 => SyncDebugScreen(),
+                      3 => SyncScreen(),
+                      4 => SyncDebugScreen(),
                       _ => const Center(child: Text('404')),
                     },
                   ),

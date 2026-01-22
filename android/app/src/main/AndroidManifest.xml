@@ -3,6 +3,7 @@
         android:label="i_gen"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
         >
         <activity
@@ -32,7 +33,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+            
     </application>
+
+      <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    
+    <!-- For getting local IP address -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+
     <!-- Gal: For supporting API <= 29 :Gal-->
      <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
                  android:maxSdkVersion="29" />

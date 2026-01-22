@@ -1,40 +1,22 @@
-// lib/sync/sync_service.dart
-
 import 'dart:async';
 import 'package:i_gen/sync/device_identity.dart';
+import 'package:i_gen/sync/network_discovery_service.dart';
 import 'package:i_gen/sync/sync_models.dart';
+import 'package:i_gen/sync/server.dart';
+import 'package:i_gen/sync/client.dart';
 import 'package:i_gen/sync/sync_repo.dart';
-
-enum SyncStatus { idle, connecting, syncing, success, error }
-
-class SyncState {
-  final SyncStatus status;
-  final String message;
-  final SyncResult? result;
-
-  const SyncState({required this.status, this.message = '', this.result});
-
-  factory SyncState.idle() => const SyncState(status: SyncStatus.idle);
-  factory SyncState.connecting() =>
-      const SyncState(status: SyncStatus.connecting, message: 'Connecting...');
-  factory SyncState.syncing(String msg) =>
-      SyncState(status: SyncStatus.syncing, message: msg);
-  factory SyncState.success(SyncResult result) =>
-      SyncState(status: SyncStatus.success, result: result);
-  factory SyncState.error(String msg) =>
-      SyncState(status: SyncStatus.error, message: msg);
-}
 
 class SyncService {
   final SyncRepository _repository;
-  final _stateController = StreamController<SyncState>.broadcast();
 
-  SyncService(this._repository);
+  late final SyncDiscovery discovery;
+  late final SyncServer server;
+  late final SyncClient client;
 
-  Stream<SyncState> get stateStream => _stateController.stream;
-
-  void dispose() {
-    _stateController.close();
+  SyncService(this._repository) {
+    discovery = SyncDiscovery();
+    server = SyncServer(this, discovery);
+    client = SyncClient(this);
   }
 
   /// Create payload with changes since last sync with target device
@@ -56,18 +38,7 @@ class SyncService {
 
   /// Merge incoming payload
   Future<SyncResult> mergePayload(SyncPayload payload) async {
-    _stateController.add(
-      SyncState.syncing('Merging ${_countItems(payload)} items...'),
-    );
-
-    try {
-      final result = await _repository.mergePayload(payload);
-      _stateController.add(SyncState.success(result));
-      return result;
-    } catch (e) {
-      _stateController.add(SyncState.error('Merge failed: $e'));
-      rethrow;
-    }
+    return await _repository.mergePayload(payload);
   }
 
   /// Get device info for handshake
@@ -79,11 +50,14 @@ class SyncService {
     );
   }
 
-  int _countItems(SyncPayload payload) {
-    return payload.products.length +
-        payload.invoices.length +
-        payload.priceCategories.length +
-        payload.prices.length +
-        payload.tombstones.length;
+  /// Get sync history
+  Future<List<Map<String, dynamic>>> getSyncHistory() async {
+    return await _repository.getSyncHistory();
+  }
+
+  void dispose() {
+    discovery.dispose();
+    server.dispose();
+    client.dispose();
   }
 }

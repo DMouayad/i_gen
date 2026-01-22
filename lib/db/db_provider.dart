@@ -91,7 +91,7 @@ class DbProvider {
         FOREIGN KEY(${DbConstants.columnPricesProductId}) 
           REFERENCES ${DbConstants.tableProduct}(${DbConstants.columnId}) ON DELETE CASCADE,
         FOREIGN KEY(${DbConstants.columnPricesPriceCategoryId}) 
-          REFERENCES ${DbConstants.tablePriceCategory}(${DbConstants.columnId}),
+          REFERENCES ${DbConstants.tablePriceCategory}(${DbConstants.columnId}) ON DELETE CASCADE,
         UNIQUE(${DbConstants.columnPricesProductId}, ${DbConstants.columnPricesPriceCategoryId}) 
           ON CONFLICT REPLACE
       )
@@ -102,6 +102,9 @@ class DbProvider {
 
     // Indexes for sync queries
     await _createSyncIndexes(db);
+
+    // seed initial products
+    await DbSeeder.seedProducts(db);
   }
 
   static Future<void> _createSyncTables(Database db) async {
@@ -188,8 +191,9 @@ class DbProvider {
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     final uuid = const Uuid();
 
+    await _backfillProductsUuids(db);
+
     final tables = [
-      DbConstants.tableProduct,
       DbConstants.tableInvoice,
       DbConstants.tableInvoiceLine,
       DbConstants.tablePriceCategory,
@@ -208,42 +212,195 @@ class DbProvider {
       }
     }
   }
+
+  static Future<void> _backfillProductsUuids(Database db) async {
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final products = await db.query(DbConstants.tableProduct);
+    for (final row in products) {
+      final id = row[DbConstants.columnId] as int;
+      final model = row[DbConstants.columnProductModel] as String;
+
+      // Check if this is a seeded product
+      final seededProduct = DbSeeder.products.firstWhere(
+        (p) => p['model'] == model,
+        orElse: () => {},
+      );
+
+      final uuid = seededProduct.isNotEmpty
+          ? seededProduct['uuid']
+                as String // Use deterministic UUID
+          : const Uuid().v4(); // Random for user-created
+
+      await db.update(
+        DbConstants.tableProduct,
+        {'uuid': uuid, 'updated_at': now},
+        where: '${DbConstants.columnId} = ?',
+        whereArgs: [id],
+      );
+    }
+  }
 }
 
 class DbSeeder {
+  static const products = [
+    {
+      '_id': 1,
+      DbConstants.columnUuid: 'seed-product-id-0001',
+      DbConstants.columnProductModel: 'A1',
+      DbConstants.columnProductName: 'مشد صدر',
+    },
+    {
+      '_id': 2,
+      DbConstants.columnUuid: 'seed-product-id-0002',
+      DbConstants.columnProductModel: 'A1+',
+      DbConstants.columnProductName: 'مشد صدر عريض',
+    },
+    {
+      '_id': 3,
+      DbConstants.columnUuid: 'seed-product-id-0003',
+      DbConstants.columnProductModel: 'B1',
+      DbConstants.columnProductName: 'مشد حزام بطن',
+    },
+    {
+      '_id': 4,
+      DbConstants.columnUuid: 'seed-product-id-0004',
+      DbConstants.columnProductModel: 'D1',
+      DbConstants.columnProductName: 'سليب بطن',
+    },
+    {
+      '_id': 5,
+      DbConstants.columnUuid: 'seed-product-id-0005',
+      DbConstants.columnProductModel: 'D2',
+      DbConstants.columnProductName: 'سليب بطن ظهر عالي',
+    },
+    {
+      '_id': 6,
+      DbConstants.columnUuid: 'seed-product-id-0006',
+      DbConstants.columnProductModel: 'C1',
+      DbConstants.columnProductName: 'شورت فوق الركبة',
+    },
+    {
+      '_id': 8,
+      DbConstants.columnUuid: 'seed-product-id-0008',
+      DbConstants.columnProductModel: 'C2',
+      DbConstants.columnProductName: 'شورت تحت الركبة',
+    },
+    {
+      '_id': 9,
+      DbConstants.columnUuid: 'seed-product-id-0009',
+      DbConstants.columnProductModel: 'A2',
+      DbConstants.columnProductName: 'مشد بودي صدر مع بطن',
+    },
+    {
+      '_id': 10,
+      DbConstants.columnUuid: 'seed-product-id-0010',
+      DbConstants.columnProductModel: 'A3',
+      DbConstants.columnProductName: 'مشد بودي مع أكمام',
+    },
+    {
+      '_id': 11,
+      DbConstants.columnUuid: 'seed-product-id-0011',
+      DbConstants.columnProductModel: 'H1',
+      DbConstants.columnProductName: 'مشد ذراعين',
+    },
+    {
+      '_id': 12,
+      DbConstants.columnUuid: 'seed-product-id-0012',
+      DbConstants.columnProductModel: 'H2',
+      DbConstants.columnProductName: 'مشد ذراعين عريض',
+    },
+    {
+      '_id': 13,
+      DbConstants.columnUuid: 'seed-product-id-0013',
+      DbConstants.columnProductModel: 'K1',
+      DbConstants.columnProductName: 'شورت فوق الركبة مع خلفية تول',
+    },
+    {
+      '_id': 14,
+      DbConstants.columnUuid: 'seed-product-id-0014',
+      DbConstants.columnProductModel: 'K2',
+      DbConstants.columnProductName: 'شورت تحت الركبة مع خلفية تول',
+    },
+    {
+      '_id': 15,
+      DbConstants.columnUuid: 'seed-product-id-0015',
+      DbConstants.columnProductModel: 'K3',
+      DbConstants.columnProductName: 'أفارول فوق الركبة مع خلفية تول',
+    },
+    {
+      '_id': 16,
+      DbConstants.columnUuid: 'seed-product-id-0016',
+      DbConstants.columnProductModel: 'K4',
+      DbConstants.columnProductName: 'أفارول للكاحل مع خلفية تول',
+    },
+    {
+      '_id': 17,
+      DbConstants.columnUuid: 'seed-product-id-0017',
+      DbConstants.columnProductModel: 'K5',
+      DbConstants.columnProductName: 'أفارول كامل مع يدين مع خلفية تول',
+    },
+    {
+      '_id': 18,
+      DbConstants.columnUuid: 'seed-product-id-0018',
+      DbConstants.columnProductModel: 'E1',
+      DbConstants.columnProductName: 'مشد تثدي رجالي',
+    },
+    {
+      '_id': 19,
+      DbConstants.columnUuid: 'seed-product-id-0019',
+      DbConstants.columnProductModel: 'E2',
+      DbConstants.columnProductName: 'كنزة حفر رجالي',
+    },
+    {
+      '_id': 20,
+      DbConstants.columnUuid: 'seed-product-id-0020',
+      DbConstants.columnProductModel: 'E3',
+      DbConstants.columnProductName: 'أفارول رجالي فوق الركبة',
+    },
+    {
+      '_id': 21,
+      DbConstants.columnUuid: 'seed-product-id-0021',
+      DbConstants.columnProductModel: 'G1',
+      DbConstants.columnProductName: 'أفارول نسائي فوق الركبة',
+    },
+    {
+      '_id': 22,
+      DbConstants.columnUuid: 'seed-product-id-0022',
+      DbConstants.columnProductModel: 'G2',
+      DbConstants.columnProductName: 'أفارول نسائي للكاحل',
+    },
+    {
+      '_id': 23,
+      DbConstants.columnUuid: 'seed-product-id-0023',
+      DbConstants.columnProductModel: 'M1',
+      DbConstants.columnProductName: 'مشد فخذين',
+    },
+    {
+      '_id': 24,
+      DbConstants.columnUuid: 'seed-product-id-0024',
+      DbConstants.columnProductModel: 'C3',
+      DbConstants.columnProductName: 'مشد طويل للكاحل',
+    },
+    {
+      '_id': 25,
+      DbConstants.columnUuid: 'seed-product-id-0025',
+      DbConstants.columnProductModel: 'S1',
+      DbConstants.columnProductName: 'مشد عنق',
+    },
+    {
+      '_id': 26,
+      DbConstants.columnUuid: 'seed-product-id-0026',
+      DbConstants.columnProductModel: 'S2',
+      DbConstants.columnProductName: 'مشد وجه',
+    },
+  ];
+
   static Future<void> seedProducts(Database db) async {
     final storedProductsCount = await db
         .rawQuery('''select count (*) from ${DbConstants.tableProduct}''')
         .then((value) => value.first.values.first as int);
-    if (storedProductsCount == 0) {
-      final products = [
-        {'_id': 1, 'model': 'A1', 'name': 'مشد صدر'},
-        {'_id': 2, 'model': 'A1+', 'name': 'مشد صدر عريض'},
-        {'_id': 3, 'model': 'B1', 'name': 'مشد حزام بطن'},
-        {'_id': 4, 'model': 'D1', 'name': 'سليب بطن'},
-        {'_id': 5, 'model': 'D2', 'name': 'سليب بطن ظهر عالي'},
-        {'_id': 6, 'model': 'C1', 'name': 'شورت فوق الركبة'},
-        {'_id': 8, 'model': 'C2', 'name': 'شورت تحت الركبة'},
-        {'_id': 9, 'model': 'A2', 'name': 'مشد بودي صدر مع بطن'},
-        {'_id': 10, 'model': 'A3', 'name': 'مشد بودي مع أكمام'},
-        {'_id': 11, 'model': 'H1', 'name': 'مشد ذراعين'},
-        {'_id': 12, 'model': 'H2', 'name': 'مشد ذراعين عريض'},
-        {'_id': 13, 'model': 'K1', 'name': 'شورت فوق الركبة مع خلفية تول'},
-        {'_id': 14, 'model': 'K2', 'name': 'شورت تحت الركبة مع خلفية تول'},
-        {'_id': 15, 'model': 'K3', 'name': 'أفارول فوق الركبة مع خلفية تول'},
-        {'_id': 16, 'model': 'K4', 'name': 'أفارول للكاحل مع خلفية تول'},
-        {'_id': 17, 'model': 'K5', 'name': 'أفارول كامل مع يدين مع خلفية تول'},
-        {'_id': 18, 'model': 'E1', 'name': 'مشد تثدي رجالي'},
-        {'_id': 19, 'model': 'E2', 'name': 'كنزة حفر رجالي'},
-        {'_id': 20, 'model': 'E3', 'name': 'أفارول رجالي فوق الركبة'},
-        {'_id': 21, 'model': 'G1', 'name': 'أفارول نسائي فوق الركبة'},
-        {'_id': 22, 'model': 'G2', 'name': 'أفارول نسائي للكاحل'},
-        {'_id': 23, 'model': 'M1', 'name': 'مشد فخذين'},
-        {'_id': 24, 'model': 'C3', 'name': 'مشد طويل للكاحل'},
-        {'_id': 25, 'model': 'S1', 'name': 'مشد عنق'},
-        {'_id': 26, 'model': 'S2', 'name': 'مشد وجه'},
-      ];
 
+    if (storedProductsCount == 0) {
       final batch = db.batch();
       for (final product in products) {
         batch.insert(DbConstants.tableProduct, product);

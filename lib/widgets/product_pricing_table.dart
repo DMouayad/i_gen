@@ -135,11 +135,15 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
     final categories = await GetIt.I.get<PricingCategoryRepo>().getAll();
     pricingCategories = categories;
     return pricingCategories
-        .map((e) => _getColumn(e.name, e.currency, priceCategoryId: e.id))
+        .map((e) => _getColumn(e.name, e.currency, priceCategory: e))
         .toList();
   }
 
-  TrinaColumn _getColumn(String name, String currency, {int? priceCategoryId}) {
+  TrinaColumn _getColumn(
+    String name,
+    String currency, {
+    PriceCategory? priceCategory,
+  }) {
     return TrinaColumn(
       title: name,
       field: name,
@@ -162,7 +166,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                 builder: (context) => _EditPriceCategoryDialog(
                   name: name,
                   currency: currency,
-                  priceCategoryId: priceCategoryId,
+                  priceCategory: priceCategory,
                   existingCategories: pricingCategories,
                   rendererContext: rendererContext,
                 ),
@@ -352,17 +356,17 @@ class _EditPriceCategoryDialog extends StatefulWidget {
     required this.name,
     required this.currency,
     required this.existingCategories,
-    this.priceCategoryId,
+    this.priceCategory,
     this.rendererContext,
   }) : assert(
-         (priceCategoryId != null && rendererContext != null) ||
-             priceCategoryId == null,
+         (priceCategory != null && rendererContext != null) ||
+             priceCategory == null,
        );
   final TrinaColumnTitleRendererContext? rendererContext;
   final String name;
   final String currency;
   final List<PriceCategory> existingCategories;
-  final int? priceCategoryId;
+  final PriceCategory? priceCategory;
   @override
   State<_EditPriceCategoryDialog> createState() =>
       _EditPriceCategoryDialogState();
@@ -391,108 +395,124 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
     return Dialog(
       child: Form(
         key: formKey,
-        child: ConstrainedBox(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(35, 35, 35, 0),
+
           constraints: BoxConstraints(maxWidth: 400, maxHeight: 350),
-          child: ListView(
-            padding: EdgeInsets.all(50),
+          child: Column(
             children: [
-              if (widget.priceCategoryId != null)
+              if (widget.priceCategory != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 20.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Edit or Delete this list'),
-                      TextButton(
-                        onPressed: () async {
-                          await GetIt.I.get<PricingCategoryRepo>().delete(
-                            widget.priceCategoryId!,
-                          );
-                          widget.rendererContext!.stateManager.removeColumns([
-                            widget.rendererContext!.column,
-                          ]);
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        },
-                        style: ButtonStyle(
-                          foregroundColor: WidgetStatePropertyAll(
-                            context.colorScheme.onError,
+                      Flexible(
+                        child: TextButton(
+                          onPressed: () async {
+                            if (widget.priceCategory == null) {
+                              return;
+                            }
+                            await GetIt.I.get<PricingCategoryRepo>().delete(
+                              widget.priceCategory!,
+                            );
+                            widget.rendererContext!.stateManager.removeColumns([
+                              widget.rendererContext!.column,
+                            ]);
+                            if (context.mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          style: ButtonStyle(
+                            foregroundColor: WidgetStatePropertyAll(
+                              context.colorScheme.onError,
+                            ),
+                            backgroundColor: WidgetStatePropertyAll(
+                              context.colorScheme.error,
+                            ),
                           ),
-                          backgroundColor: WidgetStatePropertyAll(
-                            context.colorScheme.error,
-                          ),
+                          child: Text('Delete'),
                         ),
-                        child: Text('Delete'),
                       ),
                     ],
                   ),
                 ),
-              TextFormField(
-                initialValue: widget.name,
-                style: textStyle,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Name',
-                  hintText: 'Enter name',
+
+              Flexible(
+                child: ListView(
+                  children: [
+                    TextFormField(
+                      initialValue: widget.name,
+                      style: textStyle,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'Enter name',
+                      ),
+                      onChanged: (value) => newName = value,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Name is required';
+                        }
+                        if (widget.existingCategories.any(
+                          (element) =>
+                              element.name == value &&
+                              element.name != widget.name,
+                        )) {
+                          return 'Name already exists';
+                        }
+                        return null;
+                      },
+                    ),
+                    spacer,
+                    DropdownButtonFormField<String>(
+                      initialValue: widget.currency,
+                      decoration: InputDecoration(
+                        labelText: 'Currency',
+                        hintText: 'Enter currency',
+                      ),
+                      isDense: false,
+                      style: textStyle,
+
+                      items: currencies.entries
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text(e.value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        newCurrency = value ?? '';
+                      },
+                    ),
+
+                    SizedBox(height: 40),
+
+                    FilledButton.tonal(
+                      onPressed: () {
+                        if (formKey.currentState?.validate() ?? false) {
+                          GetIt.I
+                              .get<PricingCategoryRepo>()
+                              .save(
+                                name: newName,
+                                currency: newCurrency,
+                                existing: widget.priceCategory,
+                              )
+                              .then((id) {
+                                if (context.mounted) {
+                                  Navigator.of(
+                                    context,
+                                  ).pop((id, newName, newCurrency));
+                                }
+                              });
+                        }
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ],
                 ),
-                onChanged: (value) => newName = value,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Name is required';
-                  }
-                  if (widget.existingCategories.any(
-                    (element) =>
-                        element.name == value && element.name != widget.name,
-                  )) {
-                    return 'Name already exists';
-                  }
-                  return null;
-                },
-              ),
-              spacer,
-              DropdownButtonFormField<String>(
-                initialValue: widget.currency,
-                decoration: InputDecoration(
-                  labelText: 'Currency',
-                  hintText: 'Enter currency',
-                ),
-                isDense: false,
-                style: textStyle,
-
-                items: currencies.entries
-                    .map(
-                      (e) =>
-                          DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  newCurrency = value ?? '';
-                },
-              ),
-
-              SizedBox(height: 40),
-
-              FilledButton.tonal(
-                onPressed: () {
-                  if (formKey.currentState?.validate() ?? false) {
-                    GetIt.I
-                        .get<PricingCategoryRepo>()
-                        .save(
-                          name: newName,
-                          currency: newCurrency,
-                          id: widget.priceCategoryId,
-                        )
-                        .then((id) {
-                          if (context.mounted) {
-                            Navigator.of(
-                              context,
-                            ).pop((id, newName, newCurrency));
-                          }
-                        });
-                  }
-                },
-                child: const Text('Save'),
               ),
             ],
           ),

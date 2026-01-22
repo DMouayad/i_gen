@@ -88,6 +88,11 @@ class _SyncDebugScreenState extends State<SyncDebugScreen> {
                   onPressed: _testFullSync,
                   isRunning: _isRunning,
                 ),
+                _TestButton(
+                  label: '7. Debug Prices',
+                  onPressed: _debugPrices,
+                  isRunning: _isRunning,
+                ),
               ],
             ),
           ),
@@ -119,6 +124,89 @@ class _SyncDebugScreenState extends State<SyncDebugScreen> {
     );
   }
 
+  // Add this method
+  Future<void> _debugPrices() => _runTest(() async {
+    _log('=== Debugging Prices ===');
+
+    // 1. Show all prices with their timestamps
+    final prices = await _db.rawQuery('''
+    SELECT 
+      prices.*,
+      product.model AS product_model,
+      product.uuid AS product_uuid,
+      price_category.name AS category_name,
+      price_category.uuid AS category_uuid
+    FROM ${DbConstants.tablePrices} prices
+    JOIN ${DbConstants.tableProduct} product 
+      ON prices.${DbConstants.columnPricesProductId} = product.${DbConstants.columnId}
+    JOIN ${DbConstants.tablePriceCategory} price_category 
+      ON prices.${DbConstants.columnPricesPriceCategoryId} = price_category.${DbConstants.columnId}
+    ORDER BY prices.updated_at DESC
+    LIMIT 20
+  ''');
+
+    _log('📦 Recent prices (${prices.length}):');
+
+    for (final p in prices) {
+      final updatedAt = p['updated_at'] as int? ?? 0;
+      final date = DateTime.fromMillisecondsSinceEpoch(updatedAt);
+      _log(
+        '   ${p['product_model']} / ${p['category_name']}: '
+        'price=${p['price']}, '
+        'updated=$date, '
+        'uuid=${p['uuid']}',
+      );
+    }
+
+    // 2. Check sync history
+    final history = await _db.query(DbConstants.tableSyncHistory);
+    _log('📦 Sync history:');
+    for (final h in history) {
+      final lastSync = DateTime.fromMillisecondsSinceEpoch(
+        h['last_sync_at'] as int,
+      );
+      _log('   ${h['device_name']}: last_sync=$lastSync');
+    }
+
+    // 3. Check what would be exported
+    final anchor = history.isNotEmpty
+        ? (history.first['last_sync_at'] as int? ?? 0)
+        : 0;
+
+    final toExport = await _db.rawQuery(
+      '''
+    SELECT COUNT(*) as count FROM ${DbConstants.tablePrices}
+    WHERE updated_at > ?
+  ''',
+      [anchor],
+    );
+
+    _log('📦 Prices to export (since last sync): ${toExport.first['count']}');
+
+    // 4. Verify UUIDs exist
+    final missingUuids = await _db.rawQuery('''
+    SELECT COUNT(*) as count FROM ${DbConstants.tablePrices}
+    WHERE uuid IS NULL OR uuid = ''
+  ''');
+
+    if ((missingUuids.first['count'] as int) > 0) {
+      _log('⚠️ Prices missing UUIDs: ${missingUuids.first['count']}');
+    } else {
+      _log('✅ All prices have UUIDs');
+    }
+
+    // 5. Verify updated_at exists
+    final missingTimestamps = await _db.rawQuery('''
+    SELECT COUNT(*) as count FROM ${DbConstants.tablePrices}
+    WHERE updated_at IS NULL OR updated_at = 0
+  ''');
+
+    if ((missingTimestamps.first['count'] as int) > 0) {
+      _log('⚠️ Prices missing timestamps: ${missingTimestamps.first['count']}');
+    } else {
+      _log('✅ All prices have timestamps');
+    }
+  });
   Color _getLogColor(String log) {
     if (log.contains('✅')) return Colors.green;
     if (log.contains('❌')) return Colors.red;
