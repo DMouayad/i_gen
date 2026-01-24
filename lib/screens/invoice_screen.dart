@@ -179,14 +179,31 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
         valueListenable: widget.invoiceController.enableEditingNotifier,
         builder: (context, editingEnabled, _) {
           return Scaffold(
-            appBar: AppBar(
-              actions: [
-                SizedBox(
-                  width: context.width * .8,
-                  child: AnimatedCrossFade(
-                    firstChild: Container(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: FilledButton.icon(
+            body: Stack(
+              children: [
+                Positioned.directional(
+                  textDirection: Directionality.of(context),
+                  start: 20,
+                  top: 0,
+                  bottom: 0,
+                  width: 200,
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, size: 24),
+                    label: Text('BACK', style: context.textTheme.titleMedium),
+                  ),
+                ),
+                Center(child: bodyContent),
+                Positioned.directional(
+                  textDirection: Directionality.of(context),
+                  end: 20,
+                  bottom: context.height * .3,
+                  width: 250,
+                  height: 300,
+                  child: Container(
+                    alignment: AlignmentDirectional.center,
+                    child: AnimatedCrossFade(
+                      firstChild: FilledButton.icon(
                         onPressed: () async {
                           await widget.invoiceController.saveToDB();
                           if (widget.invoiceController.invoice != null) {
@@ -199,70 +216,70 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                         icon: const Icon(Icons.save),
                         style: filledBtnStyle,
                       ),
-                    ),
-                    secondChild: Row(
-                      spacing: context.isMobile ? 0 : 4,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // if (!context.isMobile)
-                        //   ValueListenableBuilder(
-                        //     valueListenable:
-                        //         widget.invoiceController.textSizeNotifier,
-                        //     builder: (context, value, _) {
-                        //       return Row(
-                        //         children: [
-                        //           Text(
-                        //             "Text Size is ${value.floor()}",
-                        //             style: TextStyle(fontSize: 18),
-                        //           ),
-                        //           Slider(
-                        //             min: 16,
-                        //             max: 28,
-                        //             value: value.toDouble(),
-                        //             onChanged: (value) {
-                        //               widget
-                        //                   .invoiceController
-                        //                   .textSizeNotifier
-                        //                   .value = value
-                        //                   .floor();
-                        //             },
-                        //           ),
-                        //         ],
-                        //       );
-                        //     },
-                        //   ),
-                        if (!context.isMobile)
-                          TextButton.icon(
-                            onPressed: () {
-                              widget.invoiceController.enableEditing = true;
-                            },
-                            label: Text('Edit'),
-                            icon: const Icon(Icons.edit),
+                      secondChild: Column(
+                        spacing: 15,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // if (!context.isMobile)
+                          //   ValueListenableBuilder(
+                          //     valueListenable:
+                          //         widget.invoiceController.textSizeNotifier,
+                          //     builder: (context, value, _) {
+                          //       return Row(
+                          //         children: [
+                          //           Text(
+                          //             "Text Size is ${value.floor()}",
+                          //             style: TextStyle(fontSize: 18),
+                          //           ),
+                          //           Slider(
+                          //             min: 16,
+                          //             max: 28,
+                          //             value: value.toDouble(),
+                          //             onChanged: (value) {
+                          //               widget
+                          //                   .invoiceController
+                          //                   .textSizeNotifier
+                          //                   .value = value
+                          //                   .floor();
+                          //             },
+                          //           ),
+                          //         ],
+                          //       );
+                          //     },
+                          //   ),
+                          if (!context.isMobile)
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                widget.invoiceController.enableEditing = true;
+                              },
+                              label: const Text('Edit'),
+                              icon: const Icon(Icons.edit),
+                              style: filledBtnStyle,
+                            ),
+                          OutlinedButton.icon(
+                            onPressed: saveAsImage,
+                            label: const Text('Export Image'),
+                            icon: const Icon(Icons.image),
                             style: filledBtnStyle,
                           ),
-                        TextButton.icon(
-                          onPressed: saveAsImage,
-                          label: const Text('Export Image'),
-                          icon: const Icon(Icons.image),
-                          style: filledBtnStyle,
-                        ),
-                        TextButton.icon(
-                          onPressed: saveAsPdf,
-                          label: const Text('Export PDF'),
-                          icon: const Icon(Icons.file_open_rounded),
-                          style: filledBtnStyle,
-                        ),
-                      ],
+                          OutlinedButton.icon(
+                            onPressed: saveAsPdf,
+                            label: const Text('Export PDF'),
+                            icon: const Icon(Icons.file_open_rounded),
+                            style: filledBtnStyle,
+                          ),
+                        ],
+                      ),
+                      crossFadeState: editingEnabled
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      duration: const Duration(milliseconds: 300),
                     ),
-                    crossFadeState: editingEnabled
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    duration: const Duration(milliseconds: 300),
                   ),
                 ),
               ],
             ),
-            body: Center(child: bodyContent),
           );
         },
       ),

@@ -1,10 +1,11 @@
 import 'dart:io';
 
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter/material.dart';
+
 import 'package:i_gen/di.dart';
 import 'package:i_gen/l10n/app_localizations.dart';
 import 'package:i_gen/screens/home_screen.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +17,6 @@ Future<void> main() async {
 
   // register deps
   await injectDependencies();
-
   runApp(const MainApp());
 }
 

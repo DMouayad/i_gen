@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
+import 'package:i_gen/controllers/invoices_controller.dart';
 import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/order_by.dart';
 import 'package:i_gen/repos/invoice_repo.dart';
@@ -20,14 +21,15 @@ class ArchiveScreen extends StatefulWidget {
 typedef SortItem = (String, OrderBy?);
 
 class _ArchiveScreenState extends State<ArchiveScreen> {
-  List<Invoice> invoices = [];
+  InvoicesController get controller => GetIt.I.get();
+
   bool isLoading = false;
   OrderBy? orderBy = OrderBy('date', false);
 
   void handleOnSorted() async {
     if (orderBy != null) {
-      invoices = await GetIt.I.get<InvoiceRepo>().getInvoices(orderBy);
-      setState(() {});
+      final invoices = await GetIt.I.get<InvoiceRepo>().getInvoices(orderBy);
+      controller.update(invoices);
     }
   }
 
@@ -37,7 +39,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
       isLoading = true;
     });
     GetIt.I.get<InvoiceRepo>().getInvoices(orderBy).then((items) {
-      invoices = items;
+      controller.update(items);
       setState(() {
         isLoading = false;
       });
@@ -50,7 +52,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
     return Container(
       constraints: BoxConstraints(maxWidth: 1024),
       child: SingleChildScrollView(
-        padding: EdgeInsets.only(top: 30),
+        padding: const EdgeInsets.only(top: 30),
         child: Column(
           children: [
             Padding(
@@ -95,31 +97,33 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
 
             (isLoading)
                 ? const CircularProgressIndicator()
-                : invoices.isEmpty
-                ? const Text('No invoices found')
-                : Container(
-                    padding: const EdgeInsets.symmetric(vertical: 50),
-                    height: context.height,
-                    width: 1000,
-                    child: ListView.separated(
-                      itemCount: invoices.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 5),
-                      itemBuilder: (context, index) => _Item(
-                        invoice: invoices[index],
-                        onInvoiceSelected: (invoiceController) {
-                          widget.onLoaded(invoiceController);
-                        },
-                        onSaved: (newInvoice) {
-                          setState(() => invoices[index] = newInvoice);
-                        },
-                        onDeleted: () {
-                          setState(() {
-                            invoices.remove(invoices[index]);
-                          });
-                        },
-                      ),
-                    ),
+                : ListenableBuilder(
+                    listenable: controller,
+                    builder: (context, child) {
+                      final invoices = controller.invoices;
+                      return invoices.isEmpty
+                          ? const Text('No invoices found')
+                          : Container(
+                              padding: const EdgeInsets.symmetric(vertical: 50),
+                              height: context.height,
+                              width: 1000,
+                              child: ListView.separated(
+                                itemCount: invoices.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 5),
+                                itemBuilder: (context, index) => _Item(
+                                  key: ValueKey(invoices[index].id),
+                                  invoice: invoices[index],
+                                  onInvoiceSelected: (invoiceController) {
+                                    widget.onLoaded(invoiceController);
+                                  },
+                                  onSaved: controller.updateInvoice,
+                                  onDeleted: () =>
+                                      controller.removeInvoice(invoices[index]),
+                                ),
+                              ),
+                            );
+                    },
                   ),
           ],
         ),
@@ -136,6 +140,7 @@ class _Item extends StatelessWidget {
   final void Function(Invoice newInvoice) onSaved;
 
   const _Item({
+    super.key,
     required this.invoice,
     required this.onInvoiceSelected,
     required this.onDeleted,
@@ -150,7 +155,7 @@ class _Item extends StatelessWidget {
           side: BorderSide(color: context.colorScheme.surfaceDim),
           borderRadius: BorderRadius.circular(4),
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 7, horizontal: 20),
+        contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(

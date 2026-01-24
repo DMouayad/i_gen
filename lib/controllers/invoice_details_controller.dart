@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/invoice_table_row.dart';
 import 'package:i_gen/repos/invoice_repo.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 
 class InvoiceDetailsController {
   InvoiceDetailsController(this.invoice)
@@ -60,10 +61,14 @@ class InvoiceDetailsController {
     return '${_invoiceDate.value.year}-${_invoiceDate.value.month.toString().padLeft(2, '0')}-${_invoiceDate.value.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> saveToDB({bool disableEditing = true}) async {
-    if (disableEditing) {
-      enableEditing = false;
-    }
+  String formatNumberForCurrency(num n) {
+    final decimals = currency == 'USD' ? 1 : 0;
+    return NumberFormat.decimalPatternDigits(decimalDigits: decimals).format(n);
+  }
+
+  Future<void> saveToDB() async {
+    enableEditing = false;
+
     if (hasUnsavedChanges) {
       invoice = await GetIt.I.get<InvoiceRepo>().insert(
         invoiceId: invoiceId,

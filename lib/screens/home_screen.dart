@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 
 import 'package:i_gen/controllers/invoice_details_controller.dart';
+import 'package:i_gen/controllers/invoices_controller.dart';
 import 'package:i_gen/screens/archive_screen.dart';
 import 'package:i_gen/screens/debug_screen.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';
 import 'package:i_gen/screens/products_screen_mobile.dart';
 import 'package:i_gen/screens/sync_screen.dart';
+import 'package:i_gen/sync/sync_orchestrator.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
@@ -96,6 +99,13 @@ class _HomeState extends State<Home> {
   }
 
   NavListener? navListener;
+
+  @override
+  void initState() {
+    super.initState();
+    // checkSyncOnStartup(context);
+  }
+
   @override
   void dispose() {
     unsavedProductPricingCountNotifier.dispose();
@@ -106,6 +116,42 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
+  void checkSyncOnStartup(BuildContext context) {
+    final orchestrator = GetIt.I.get<SyncOrchestrator>();
+
+    if (orchestrator.shouldPromptForSync()) {
+      // Show a prompt
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Sync Available'),
+            content: Text(
+              'It\'s been ${orchestrator.preferences.syncIntervalHours} hours '
+              'since your last sync. Would you like to sync now?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  orchestrator.syncWithDefaultDevice();
+                },
+                child: const Text('Sync Now'),
+              ),
+            ],
+          ),
+        );
+      });
+    }
+  }
+
+  InvoicesController get invoicesController =>
+      GetIt.I.get<InvoicesController>();
+
   void _onCreateNew() {
     currentInvoiceDetailsController = InvoiceDetailsController(null);
     Navigator.of(context).push(
@@ -114,9 +160,11 @@ class _HomeState extends State<Home> {
           return context.isMobile
               ? InvoiceDetailsMobile(
                   controller: currentInvoiceDetailsController!,
+                  onSaved: invoicesController.addNewInvoice,
                 )
               : InvoiceDetails(
                   invoiceController: currentInvoiceDetailsController!,
+                  onSaved: invoicesController.addNewInvoice,
                 );
         },
       ),
@@ -140,6 +188,7 @@ class _HomeState extends State<Home> {
                   onPressed: _onCreateNew,
                   child: const Icon(Icons.add),
                 ),
+
           bottomNavigationBar: context.showNavigationRail
               ? null
               : BottomNavigationBar(

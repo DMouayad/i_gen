@@ -1,7 +1,10 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:get_it/get_it.dart';
+
+import 'package:i_gen/screens/sync_settings_screen.dart';
 import 'package:i_gen/sync/client.dart';
 import 'package:i_gen/sync/network_discovery_service.dart';
 import 'package:i_gen/sync/server.dart';
@@ -48,27 +51,50 @@ class _SyncScreenState extends State<SyncScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sync'),
-        bottom: TabBar(
+    return SizedBox(
+      width: 1020,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Sync'),
+          actions: [
+            IconButton(
+              onPressed: () => showDialog(
+                context: context,
+                fullscreenDialog: false,
+                useSafeArea: true,
+                builder: (context) => Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  constraints: const BoxConstraints(
+                    maxWidth: 820,
+                    maxHeight: 500,
+                  ),
+                  child: const SyncSettingsScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.settings),
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(icon: Icon(Icons.download), text: 'Receive'),
+              Tab(icon: Icon(Icons.upload), text: 'Send'),
+            ],
+          ),
+        ),
+        body: TabBarView(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.download), text: 'Receive'),
-            Tab(icon: Icon(Icons.upload), text: 'Send'),
+          children: [
+            _ReceiveTab(syncService: _syncService),
+            _SendTab(
+              syncService: _syncService,
+              ipController: _ipController,
+              portController: _portController,
+            ),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _ReceiveTab(syncService: _syncService),
-          _SendTab(
-            syncService: _syncService,
-            ipController: _ipController,
-            portController: _portController,
-          ),
-        ],
       ),
     );
   }
@@ -129,6 +155,22 @@ class _ReceiveContent extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
+          const SizedBox(height: 12),
+          // QR Code or Status
+          if (state.status == ServerStatus.running)
+            FutureBuilder<SyncQrData>(
+              future: _buildQrData(state),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return SyncQrDisplay(qrData: snapshot.data!);
+                }
+                return const CircularProgressIndicator();
+              },
+            )
+          else
+            _buildStatusDisplay(context, colors),
+          const SizedBox(height: 32),
+
           // Action Button
           FilledButton.icon(
             onPressed: state.status == ServerStatus.running ? onStop : onStart,
@@ -149,20 +191,6 @@ class _ReceiveContent extends StatelessWidget {
                   : colors.primary,
             ),
           ),
-          const SizedBox(height: 12),
-          // QR Code or Status
-          if (state.status == ServerStatus.running)
-            FutureBuilder<SyncQrData>(
-              future: _buildQrData(state),
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  return SyncQrDisplay(qrData: snapshot.data!);
-                }
-                return const CircularProgressIndicator();
-              },
-            )
-          else
-            _buildStatusDisplay(context, colors),
 
           const SizedBox(height: 32),
 

@@ -91,6 +91,9 @@ class SyncServer {
       // GET /health - Simple health check
       router.get('/health', (Request req) => Response.ok('OK'));
 
+      // POST /pull - Remote device requests our changes
+      router.post('/pull', _handlePull);
+
       // Add CORS and logging middleware
       final handler = const Pipeline()
           .addMiddleware(_corsMiddleware())
@@ -136,7 +139,7 @@ class SyncServer {
   /// Handle POST /sync
   Future<Response> _handleSync(Request request) async {
     try {
-      print('📥 Received sync request');
+      debugPrint('📥 Received sync request');
 
       final body = await request.readAsString();
       final json = jsonDecode(body) as Map<String, dynamic>;
@@ -148,13 +151,13 @@ class SyncServer {
           payload.priceCategories.length +
           payload.prices.length;
 
-      print(
+      debugPrint(
         '📥 Receiving sync from ${payload.sourceDeviceName}: $itemCount items',
       );
 
       final result = await _syncService.mergePayload(payload);
 
-      print('✅ Sync complete: $result');
+      debugPrint('✅ Sync complete: $result');
 
       // Update state but keep server running
       _updateState(
@@ -179,10 +182,48 @@ class SyncServer {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      print('❌ Sync error: $e');
-      print(stack);
+      debugPrint('❌ Sync error: $e');
+      debugPrint(stack.toString());
 
       // Don't change server state on error - keep running
+      return Response.internalServerError(
+        body: jsonEncode({'error': e.toString()}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// Handle POST /pull - Remote device requests our changes
+  Future<Response> _handlePull(Request request) async {
+    try {
+      final body = await request.readAsString();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+
+      final requestingDeviceId = json['device_id'] as String;
+      final requestingDeviceName = json['device_name'] as String? ?? 'Unknown';
+
+      debugPrint(
+        '📤 Pull request from $requestingDeviceName ($requestingDeviceId)',
+      );
+
+      // Get changes for the requesting device
+      final payload = await _syncService.createPayload(requestingDeviceId);
+
+      final itemCount =
+          payload.products.length +
+          payload.invoices.length +
+          payload.priceCategories.length +
+          payload.prices.length;
+
+      debugPrint('📤 Sending $itemCount items to $requestingDeviceName');
+
+      return Response.ok(
+        jsonEncode(payload.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e, stack) {
+      debugPrint('❌ Pull error: $e');
+      debugPrint(stack.toString());
       return Response.internalServerError(
         body: jsonEncode({'error': e.toString()}),
         headers: {'Content-Type': 'application/json'},

@@ -80,10 +80,10 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
         : context.textTheme.titleLarge;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Products'),
+        title: const Text('Products'),
         backgroundColor: context.theme.scaffoldBackgroundColor,
         surfaceTintColor: context.colorScheme.surface,
-        actionsPadding: EdgeInsets.symmetric(horizontal: 4),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 4),
         actions: [
           TextButton.icon(
             style: ButtonStyle(
@@ -92,7 +92,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
                   : WidgetStatePropertyAll(Size(200, 55)),
             ),
             label: Text('New Product', style: textStyle),
-            icon: Icon(Icons.add),
+            icon: const Icon(Icons.add),
             onPressed: _showEditDialog,
           ),
         ],
@@ -117,7 +117,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
               ),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 60),
                   itemCount: _filteredProducts.length,
                   itemBuilder: (context, index) {
                     final product = _filteredProducts[index];
@@ -157,12 +157,10 @@ class ProductListItem extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 2.0),
-      color: context.colorScheme.surfaceContainerHighest.withOpacity(0.4),
-
-      shape: RoundedRectangleBorder(
-        side: BorderSide(width: 0.5, color: context.colorScheme.outline),
-        borderRadius: BorderRadius.circular(8),
+      margin: EdgeInsets.zero,
+      color: Colors.transparent,
+      shape: Border(
+        bottom: BorderSide(width: 0.5, color: context.colorScheme.outline),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -174,8 +172,8 @@ class ProductListItem extends StatelessWidget {
                 style: titleStyle,
               ),
             ),
-            IconButton(icon: Icon(Icons.edit), onPressed: onEdit),
-            IconButton(icon: Icon(Icons.delete), onPressed: onDelete),
+            IconButton(icon: const Icon(Icons.edit), onPressed: onEdit),
+            IconButton(icon: const Icon(Icons.delete), onPressed: onDelete),
           ],
         ),
       ),
@@ -235,7 +233,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             TextFormField(
               style: textStyle,
               controller: _modelController,
-              decoration: InputDecoration(labelText: 'Model'),
+              decoration: const InputDecoration(labelText: 'Model'),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter a model';
@@ -247,7 +245,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             TextFormField(
               style: textStyle,
               controller: _nameController,
-              decoration: InputDecoration(labelText: 'Name'),
+              decoration: const InputDecoration(labelText: 'Name'),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter a name';
@@ -261,9 +259,9 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel'),
+          child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _save, child: Text('Save')),
+        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

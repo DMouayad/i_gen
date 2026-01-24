@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:i_gen/sync/device_identity.dart';
 import 'package:i_gen/sync/sync_models.dart';
 import 'package:i_gen/sync/sync_service.dart';
 import 'package:i_gen/sync/network_utils.dart';
@@ -186,6 +187,44 @@ class SyncClient {
         _updateState(ClientState.idle());
       }
     });
+  }
+
+  /// Request the remote server to send us their changes
+  Future<SyncPayload?> requestPull({
+    required String ip,
+    required int port,
+    required String requestingDeviceId,
+  }) async {
+    final baseUrl = 'http://$ip:$port';
+    final client = _createClient();
+
+    try {
+      final deviceName = await DeviceIdentity.getDeviceName();
+
+      final response = await client
+          .post(
+            Uri.parse('$baseUrl/pull'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'device_id': requestingDeviceId,
+              'device_name': deviceName,
+            }),
+          )
+          .timeout(syncTimeout);
+
+      if (response.statusCode != 200) {
+        print('Pull request failed: ${response.statusCode}');
+        return null;
+      }
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return SyncPayload.fromJson(json);
+    } catch (e) {
+      print('Pull request error: $e');
+      return null;
+    } finally {
+      client.close();
+    }
   }
 
   /// Manually reset state (can be called from UI)
