@@ -2,8 +2,10 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/utils/context_extensions.dart';
+import 'package:i_gen/widgets/read_only_banner.dart';
 import 'package:i_gen/widgets/trina_table_header.dart';
 import 'package:trina_grid/trina_grid.dart';
 
@@ -16,7 +18,6 @@ class ProductsScreen2 extends StatefulWidget {
 }
 
 class _ProductsScreen2State extends State<ProductsScreen2> {
-  late final List<TrinaColumn> columns;
   final storedProducts = GetIt.I.get<ProductsController>().products;
   late TrinaGridStateManager stateManager;
   late final List<TrinaRow> rows;
@@ -33,9 +34,15 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    columns = [
+  /// Whether catalog editing is disabled for the current role. Updated on
+  /// every build from the auth stream; the database remains the enforcer.
+  bool _readOnly = false;
+
+  /// Builds the grid columns for the given mode. Called on every build so a
+  /// role change (sign in/out) immediately flips edit affordances without
+  /// touching the rows.
+  List<TrinaColumn> _buildColumns(bool readOnly) {
+    return [
       TrinaColumn(
         title: 'ID',
         field: 'id',
@@ -53,7 +60,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
           return null;
         },
         sort: TrinaColumnSort.descending,
-        enableEditingMode: true,
+        enableEditingMode: !readOnly,
         renderer: (rendererContext) => Container(
           constraints: BoxConstraints.expand(),
           margin: EdgeInsets.all(.1),
@@ -81,7 +88,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
         minWidth: 300,
         enableColumnDrag: false,
         enableContextMenu: false,
-        enableEditingMode: true,
+        enableEditingMode: !readOnly,
         enableTitleChecked: false,
       ),
       TrinaColumn(
@@ -103,22 +110,23 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
           return OverflowBar(
             alignment: MainAxisAlignment.spaceAround,
             children: [
-              IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: () async {
-                  final toDelete = GetIt.I
-                      .get<ProductsController>()
-                      .products[rendererContext.row.cells['id']!.value];
-                  // ONLY if the product exists in the db, delete it
-                  if (toDelete != null) {
-                    await GetIt.I.get<ProductsController>().deleteProduct(
-                      toDelete,
-                    );
-                  }
-                  stateManager.removeRows([rendererContext.row]);
-                  updateDirtyCount();
-                },
-              ),
+              if (!readOnly)
+                IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: () async {
+                    final toDelete = GetIt.I
+                        .get<ProductsController>()
+                        .products[rendererContext.row.cells['id']!.value];
+                    // ONLY if the product exists in the db, delete it
+                    if (toDelete != null) {
+                      await GetIt.I.get<ProductsController>().deleteProduct(
+                        toDelete,
+                      );
+                    }
+                    stateManager.removeRows([rendererContext.row]);
+                    updateDirtyCount();
+                  },
+                ),
               if (rendererContext.cell.value == 'edited') ...[
                 IconButton(
                   icon: Icon(Icons.done),
@@ -157,7 +165,11 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
         },
       ),
     ];
+  }
 
+  @override
+  void initState() {
+    super.initState();
     rows = GetIt.I
         .get<ProductsController>()
         .products
@@ -172,8 +184,6 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
           ),
         )
         .toList();
-
-    super.initState();
   }
 
   void updateDirtyCount() {
@@ -199,86 +209,116 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 1024,
-      height: context.height,
-      child: TrinaGrid(
-        columns: columns,
-        rows: rows,
-        onChanged: (TrinaGridOnChangedEvent event) {
-          updateDirtyCount();
+    final auth = AuthService.instance;
+    return StreamBuilder<UserRole?>(
+      stream: auth.currentRoleStream,
+      initialData: auth.currentRole,
+      builder: (context, snapshot) {
+        // Fail-open while signed out: local editing keeps working offline;
+        // the database remains the enforcer for signed-in roles.
+        final readOnly = auth.isSignedIn && !auth.canEditCatalog;
+        _readOnly = readOnly;
+        return Stack(
+          children: [
+            SizedBox(
+              width: 1024,
+              height: context.height,
+              child: TrinaGrid(
+                columns: _buildColumns(readOnly),
+                rows: rows,
+                onChanged: (TrinaGridOnChangedEvent event) {
+                  if (_readOnly) return;
+                  updateDirtyCount();
 
-          if (event.row.cells['status']!.value == 'saved') {
-            event.row.cells['status']!.value = 'edited';
-            stateManager.notifyListeners();
-          }
-        },
+                  if (event.row.cells['status']!.value == 'saved') {
+                    event.row.cells['status']!.value = 'edited';
+                    stateManager.notifyListeners();
+                  }
+                },
 
-        onValidationFailed: (event) {
-          stateManager.gridFocusNode.unfocus();
-          stateManager.setSelecting(false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                event.errorMessage,
-                style: textStyle.copyWith(
-                  color: context.colorScheme.onErrorContainer,
+                onValidationFailed: (event) {
+                  stateManager.gridFocusNode.unfocus();
+                  stateManager.setSelecting(false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        event.errorMessage,
+                        style: textStyle.copyWith(
+                          color: context.colorScheme.onErrorContainer,
+                        ),
+                      ),
+
+                      behavior: SnackBarBehavior.floating,
+                      width: min(700, context.width * .8),
+                      backgroundColor: context.colorScheme.errorContainer,
+                      duration: Duration(seconds: 10),
+                    ),
+                  );
+
+                  stateManager.setEditing(false);
+                },
+                createHeader: (stateManager) => TrinaTableHeader(
+                  addNewText: 'Add Product',
+                  showAdd: !readOnly,
+                  unSavedCountText: (count) =>
+                      'You have $count un saved products',
+                  unSavedCountNotifier: widget.unsavedProductCountNotifier,
+                  stateManager: stateManager,
+                  newRow: () => TrinaRow(
+                    cells: {
+                      'id': TrinaCell(value: 'new'),
+                      'name': TrinaCell(value: 'new'),
+                      'status': TrinaCell(value: 'created'),
+                    },
+                  ),
+                ),
+
+                configuration: TrinaGridConfiguration(
+                  enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
+                  style: TrinaGridStyleConfig(
+                    cellDirtyColor: Colors.amber[100]!,
+                    borderColor: context.colorScheme.surfaceDim,
+                    gridBorderColor: context.colorScheme.surfaceDim,
+                    gridBorderRadius: BorderRadius.circular(6),
+                    cellTextStyle: textStyle,
+                    columnTextStyle: textStyle.copyWith(
+                      color: context.colorScheme.primary,
+                    ),
+                    evenRowColor: Colors.white,
+                    oddRowColor: context.colorScheme.surface,
+                  ),
+                  scrollbar: TrinaGridScrollbarConfig(
+                    showHorizontal: false,
+                    showVertical: false,
+                  ),
+                  columnSize: TrinaGridColumnSizeConfig(
+                    autoSizeMode: TrinaAutoSizeMode.scale,
+                  ),
+                ),
+
+                onLoaded: (TrinaGridOnLoadedEvent event) {
+                  event.stateManager.setSelectingMode(
+                    TrinaGridSelectingMode.cell,
+                  );
+                  stateManager = event.stateManager;
+                  stateManager.setChangeTracking(true);
+                  stateManager.setAutoEditing(!_readOnly);
+                },
+              ),
+            ),
+            if (readOnly)
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ReadOnlyBanner(
+                  text:
+                      'Catalog is read-only for your role — ask an admin for changes.',
                 ),
               ),
-
-              behavior: SnackBarBehavior.floating,
-              width: min(700, context.width * .8),
-              backgroundColor: context.colorScheme.errorContainer,
-              duration: Duration(seconds: 10),
-            ),
-          );
-
-          stateManager.setEditing(false);
-        },
-        createHeader: (stateManager) => TrinaTableHeader(
-          addNewText: 'Add Product',
-          unSavedCountText: (count) => 'You have $count un saved products',
-          unSavedCountNotifier: widget.unsavedProductCountNotifier,
-          stateManager: stateManager,
-          newRow: () => TrinaRow(
-            cells: {
-              'id': TrinaCell(value: 'new'),
-              'name': TrinaCell(value: 'new'),
-              'status': TrinaCell(value: 'created'),
-            },
-          ),
-        ),
-
-        configuration: TrinaGridConfiguration(
-          enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
-          style: TrinaGridStyleConfig(
-            cellDirtyColor: Colors.amber[100]!,
-            borderColor: context.colorScheme.surfaceDim,
-            gridBorderColor: context.colorScheme.surfaceDim,
-            gridBorderRadius: BorderRadius.circular(6),
-            cellTextStyle: textStyle,
-            columnTextStyle: textStyle.copyWith(
-              color: context.colorScheme.primary,
-            ),
-            evenRowColor: Colors.white,
-            oddRowColor: context.colorScheme.surface,
-          ),
-          scrollbar: TrinaGridScrollbarConfig(
-            showHorizontal: false,
-            showVertical: false,
-          ),
-          columnSize: TrinaGridColumnSizeConfig(
-            autoSizeMode: TrinaAutoSizeMode.scale,
-          ),
-        ),
-
-        onLoaded: (TrinaGridOnLoadedEvent event) {
-          event.stateManager.setSelectingMode(TrinaGridSelectingMode.cell);
-          stateManager = event.stateManager;
-          stateManager.setChangeTracking(true);
-          stateManager.setAutoEditing(true);
-        },
-      ),
+          ],
+        );
+      },
     );
   }
 }

@@ -1,4 +1,22 @@
+import 'dart:math';
+
 import 'package:sqflite/sqflite.dart';
+
+/// One mutation to a synced row: the triple that travels together to the
+/// outbox (replaces the old table/rowId/op parameter clump).
+class MutationRef {
+  const MutationRef({
+    required this.table,
+    required this.rowId,
+    required this.op,
+  });
+
+  final String table;
+  final int rowId;
+
+  /// One of [DbConstants.opInsert], [DbConstants.opUpdate], [DbConstants.opDelete].
+  final String op;
+}
 
 class DbConstants {
   static const String tableProduct = 'product';
@@ -34,21 +52,92 @@ class DbConstants {
   static const String columnPriceCategoryId = '_id';
   static const String columnPriceCategoryName = 'name';
   static const String columnPriceCategoryCurrency = 'currency';
+
+  // Phase 2 — per-row sync metadata (all five business tables).
+  static const String columnRemoteId = 'remote_id';
+  static const String columnUpdatedAt = 'updated_at';
+  static const String columnIsDeleted = 'is_deleted';
+
+  // Phase 2 — outbox queue of pending offline operations.
+  static const String tableOutbox = 'outbox';
+  static const String columnOpId = 'op_id';
+  static const String columnTableName = 'table_name';
+  static const String columnRowId = 'row_id';
+  static const String columnOp = 'op';
+  static const String columnPayload = 'payload';
+  static const String columnCreatedAt = 'created_at';
+  static const String columnAttempts = 'attempts';
+  static const String columnLastError = 'last_error';
+
+  static const String opInsert = 'insert';
+  static const String opUpdate = 'update';
+  static const String opDelete = 'delete';
+
+  // Phase 2 — per-table pull checkpoints.
+  static const String tableSyncState = 'sync_state';
+  static const String columnLastPullAt = 'last_pull_at';
+
+  /// The five business tables that participate in sync.
+  static const List<String> syncedTables = [
+    tableProduct,
+    tableInvoice,
+    tableInvoiceLine,
+    tablePrices,
+    tablePriceCategory,
+  ];
+
+  // Phase 3/5 — sync policy knobs (single source; engine and maintenance
+  // both read these, so the parked threshold can never drift apart again).
+  /// An op counts as parked (dead-letter) after this many failed attempts.
+  static const int parkedAfterAttempts = 5;
+
+  /// Parked ops are capped; oldest evicted first (with a visible warning).
+  static const int maxParkedOps = 200;
+
+  /// Soft-deleted rows older than this are purged on startup.
+  static const Duration tombstoneRetention = Duration(days: 30);
+
+  /// Payloads larger than this log a warning (visible, not silently slow).
+  static const int payloadWarnBytes = 300 * 1024;
+
+  /// Client-generated outbox idempotency key: unique per operation.
+  static String newOpId() {
+    final rand = Random.secure();
+    final micros = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final suffix = rand.nextInt(1 << 32).toRadixString(36).padLeft(7, '0');
+    return '$micros-$suffix';
+  }
 }
 
 class DbProvider {
+  static const int dbVersion = 2;
+
   static Future<Database> open(String path) async {
     return await openDatabase(
       path,
-      version: 1,
+      version: dbVersion,
       onCreate: (Database db, int version) async {
-        await db.execute('''
+        await createV1Tables(db);
+        await applyV2Migration(db);
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        if (oldVersion < 2) {
+          await applyV2Migration(db);
+        }
+      },
+    );
+  }
+
+  /// Original version-1 schema. Kept intact so upgrades and fresh installs
+  /// share one definition.
+  static Future<void> createV1Tables(Database db) async {
+    await db.execute('''
 create table ${DbConstants.tableProduct} (
   ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnProductModel} text not null unique,
   ${DbConstants.columnProductName} text not null)
 ''');
-        await db.execute('''
+    await db.execute('''
 create table ${DbConstants.tableInvoice} (
   ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnInvoiceTotal} REAL not null,
@@ -58,10 +147,16 @@ create table ${DbConstants.tableInvoice} (
   ${DbConstants.columnInvoiceDiscount} REAL not null
   )
 ''');
-        await db.execute('''
+    await db.execute('''
 create INDEX "customer_name" on ${DbConstants.tableInvoice} ( ${DbConstants.columnCustomerName} )
  ''');
-        await db.execute('''
+    // Known exception to the "no REPLACE on synced tables" invariant:
+    // these two child tables use `UNIQUE ... ON CONFLICT REPLACE` as a
+    // local upsert. Repos write update-in-place so REPLACE rarely fires,
+    // and removing it needs a v3 migration (new failure mode: UNIQUE
+    // throws instead of upserting). Left as-is deliberately — do not
+    // add REPLACE to any other synced table.
+    await db.execute('''
 create table ${DbConstants.tableInvoiceLine} (
   ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnInvoiceLineInvoiceId} integer not null,
@@ -75,7 +170,7 @@ create table ${DbConstants.tableInvoiceLine} (
   )
 ''');
 
-        await db.execute('''
+    await db.execute('''
 create table ${DbConstants.tablePrices} (
   ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnPricesProductId} integer not null,
@@ -86,57 +181,70 @@ create table ${DbConstants.tablePrices} (
   unique(${DbConstants.columnPricesProductId}, ${DbConstants.columnPricesPriceCategoryId}) ON CONFLICT REPLACE
   )
 ''');
-        await db.execute('''
+    await db.execute('''
 create table ${DbConstants.tablePriceCategory} (
   ${DbConstants.columnId} integer primary key autoincrement,
   ${DbConstants.columnPriceCategoryName} text not null unique,
   ${DbConstants.columnPriceCategoryCurrency} text not null
   )
 ''');
-      },
-    );
   }
-}
 
-class DbSeeder {
-  static Future<void> seedProducts(Database db) async {
-    final storedProductsCount = await db
-        .rawQuery('''select count (*) from ${DbConstants.tableProduct}''')
-        .then((value) => value.first.values.first as int);
-    if (storedProductsCount == 0) {
-      final products = [
-        {'_id': 1, 'model': 'A1', 'name': 'مشد صدر'},
-        {'_id': 2, 'model': 'A1+', 'name': 'مشد صدر عريض'},
-        {'_id': 3, 'model': 'B1', 'name': 'مشد حزام بطن'},
-        {'_id': 4, 'model': 'D1', 'name': 'سليب بطن'},
-        {'_id': 5, 'model': 'D2', 'name': 'سليب بطن ظهر عالي'},
-        {'_id': 6, 'model': 'C1', 'name': 'شورت فوق الركبة'},
-        {'_id': 8, 'model': 'C2', 'name': 'شورت تحت الركبة'},
-        {'_id': 9, 'model': 'A2', 'name': 'مشد بودي صدر مع بطن'},
-        {'_id': 10, 'model': 'A3', 'name': 'مشد بودي مع أكمام'},
-        {'_id': 11, 'model': 'H1', 'name': 'مشد ذراعين'},
-        {'_id': 12, 'model': 'H2', 'name': 'مشد ذراعين عريض'},
-        {'_id': 13, 'model': 'K1', 'name': 'شورت فوق الركبة مع خلفية تول'},
-        {'_id': 14, 'model': 'K2', 'name': 'شورت تحت الركبة مع خلفية تول'},
-        {'_id': 15, 'model': 'K3', 'name': 'أفارول فوق الركبة مع خلفية تول'},
-        {'_id': 16, 'model': 'K4', 'name': 'أفارول للكاحل مع خلفية تول'},
-        {'_id': 17, 'model': 'K5', 'name': 'أفارول كامل مع يدين مع خلفية تول'},
-        {'_id': 18, 'model': 'E1', 'name': 'مشد تثدي رجالي'},
-        {'_id': 19, 'model': 'E2', 'name': 'كنزة حفر رجالي'},
-        {'_id': 20, 'model': 'E3', 'name': 'أفارول رجالي فوق الركبة'},
-        {'_id': 21, 'model': 'G1', 'name': 'أفارول نسائي فوق الركبة'},
-        {'_id': 22, 'model': 'G2', 'name': 'أفارول نسائي للكاحل'},
-        {'_id': 23, 'model': 'M1', 'name': 'مشد فخذين'},
-        {'_id': 24, 'model': 'C3', 'name': 'مشد طويل للكاحل'},
-        {'_id': 25, 'model': 'S1', 'name': 'مشد عنق'},
-        {'_id': 26, 'model': 'S2', 'name': 'مشد وجه'},
-      ];
-
-      final batch = db.batch();
-      for (final product in products) {
-        batch.insert(DbConstants.tableProduct, product);
-      }
-      await batch.commit(noResult: true);
+  /// Version 2 migration (Phase 2 spec). Additive only: three columns per
+  /// business table plus the `outbox` and `sync_state` bookkeeping tables.
+  /// Existing rows get `updated_at` backfilled with the migration time;
+  /// `remote_id` stays null so the first sync pushes them as inserts.
+  ///
+  /// Note: the spec writes the column as `remote_id TEXT UNIQUE`, but SQLite
+  /// rejects UNIQUE inside `ADD COLUMN` ("Cannot add a UNIQUE column"), so
+  /// the column is added plain and uniqueness is enforced with an equivalent
+  /// `CREATE UNIQUE INDEX` (multiple NULLs allowed in both variants).
+  static Future<void> applyV2Migration(Database db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final table in DbConstants.syncedTables) {
+      await db.execute(
+        'ALTER TABLE $table '
+        'ADD COLUMN ${DbConstants.columnRemoteId} TEXT',
+      );
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_remote_id '
+        'ON $table (${DbConstants.columnRemoteId})',
+      );
+      await db.execute(
+        'ALTER TABLE $table '
+        'ADD COLUMN ${DbConstants.columnUpdatedAt} INTEGER',
+      );
+      await db.execute(
+        'ALTER TABLE $table '
+        'ADD COLUMN ${DbConstants.columnIsDeleted} INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.update(table, {
+        DbConstants.columnUpdatedAt: now,
+      }, where: '${DbConstants.columnUpdatedAt} IS NULL');
     }
+    await db.execute('''
+create table if not exists ${DbConstants.tableOutbox} (
+  ${DbConstants.columnOpId} TEXT primary key,
+  ${DbConstants.columnTableName} TEXT not null,
+  ${DbConstants.columnRowId} integer not null,
+  ${DbConstants.columnOp} TEXT not null,
+  ${DbConstants.columnPayload} TEXT not null,
+  ${DbConstants.columnCreatedAt} integer not null,
+  ${DbConstants.columnAttempts} integer not null default 0,
+  ${DbConstants.columnLastError} TEXT
+  )
+''');
+    await db.execute('''
+create index if not exists idx_outbox_fifo
+  on ${DbConstants.tableOutbox} (${DbConstants.columnTableName}, ${DbConstants.columnCreatedAt})
+''');
+    await db.execute('''
+create table if not exists ${DbConstants.tableSyncState} (
+  ${DbConstants.columnTableName} TEXT primary key,
+  ${DbConstants.columnLastPullAt} integer
+  )
+''');
   }
 }
+
+// DbSeeder moved to lib/db_seeder.dart (schema file stays dependency-free).

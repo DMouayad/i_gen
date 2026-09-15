@@ -75,7 +75,7 @@ class InvoiceDetailsMobile extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         tileColor: context.colorScheme.surfaceContainerHighest
-                            .withOpacity(0.4),
+                            .withValues(alpha: 0.4),
                         onTap: () async {
                           final newDate = await showDatePicker(
                             context: context,
@@ -110,7 +110,7 @@ class InvoiceDetailsMobile extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         color: context.colorScheme.surfaceContainerHighest
-                            .withOpacity(0.4),
+                            .withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       margin: const EdgeInsets.all(8.0),
@@ -137,8 +137,9 @@ class InvoiceDetailsMobile extends StatelessWidget {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: context.colorScheme.surfaceContainerHighest
-                      .withOpacity(0.4),
+                  color: context.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.4,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(

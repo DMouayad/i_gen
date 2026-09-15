@@ -10,12 +10,17 @@ class TrinaTableHeader extends StatelessWidget {
     required this.newRow,
     required this.addNewText,
     required this.unSavedCountText,
+    this.showAdd = true,
   });
   final String addNewText;
   final String Function(int) unSavedCountText;
   final ValueNotifier<int> unSavedCountNotifier;
   final TrinaGridStateManager stateManager;
   final TrinaRow Function() newRow;
+
+  /// When false the add button is hidden (role read-only). Defaults to true
+  /// so existing callers keep today's behavior.
+  final bool showAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -53,22 +58,23 @@ class TrinaTableHeader extends StatelessWidget {
                   : SizedBox.shrink();
             },
           ),
-          TextButton.icon(
-            label: Text(addNewText, style: context.textTheme.titleMedium),
-            icon: Icon(Icons.add),
-            onPressed: () {
-              stateManager.insertRows(stateManager.refRows.last.sortIdx + 1, [
-                newRow(),
-              ]);
-              final newLastRow = stateManager.refRows.last;
-              stateManager.moveScrollByRow(
-                TrinaMoveDirection.down,
-                newLastRow.sortIdx,
-              );
+          if (showAdd)
+            TextButton.icon(
+              label: Text(addNewText, style: context.textTheme.titleMedium),
+              icon: Icon(Icons.add),
+              onPressed: () {
+                stateManager.insertRows(stateManager.refRows.last.sortIdx + 1, [
+                  newRow(),
+                ]);
+                final newLastRow = stateManager.refRows.last;
+                stateManager.moveScrollByRow(
+                  TrinaMoveDirection.down,
+                  newLastRow.sortIdx,
+                );
 
-              stateManager.setHoveredRowIdx(newLastRow.sortIdx);
-            },
-          ),
+                stateManager.setHoveredRowIdx(newLastRow.sortIdx);
+              },
+            ),
         ],
       ),
     );

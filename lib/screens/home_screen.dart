@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/screens/archive_screen.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
+import 'package:i_gen/screens/orders_screen.dart';
 import 'package:i_gen/screens/products_screen.dart';
 import 'package:i_gen/screens/products_screen_mobile.dart';
+import 'package:i_gen/screens/settings_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
@@ -153,6 +155,14 @@ class _HomeState extends State<Home> {
                       icon: Icon(Icons.currency_exchange),
                       label: 'Pricing',
                     ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.receipt_long_outlined),
+                      label: 'Orders',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.settings),
+                      label: 'Settings',
+                    ),
                   ],
                   onTap: navListener!.updateIndex,
                 ),
@@ -212,6 +222,16 @@ class _HomeState extends State<Home> {
                         selectedIcon: Icon(Icons.currency_exchange),
                         label: Text('Pricing'),
                       ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.receipt_long_outlined),
+                        selectedIcon: Icon(Icons.receipt_long),
+                        label: Text('Orders'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: Text('Settings'),
+                      ),
                     ],
                   ),
                 Flexible(
@@ -245,6 +265,8 @@ class _HomeState extends State<Home> {
                         unsavedProductPricingCountNotifier,
                         unsavedPricingCategoryCountNotifier,
                       ),
+                      3 => const OrdersScreen(),
+                      4 => const SettingsScreen(),
                       _ => const Center(child: Text('404')),
                     },
                   ),

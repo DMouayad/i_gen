@@ -17,11 +17,11 @@ class InvoiceLine {
   double get lineTotal => amount * price * (1 - discount);
   static InvoiceLine? fromMap(Map<String, dynamic> map) {
     if (map case {
-          'invoice_id': int invoiceId,
-          'product': Map<String, dynamic> product,
-          'amount': int amount,
-          'price': double price,
-        }) {
+      'invoice_id': int invoiceId,
+      'product': Map<String, dynamic> product,
+      'amount': int amount,
+      'price': double price,
+    }) {
       Product? prod = Product.fromMap(product);
       if (prod != null) {
         return InvoiceLine(

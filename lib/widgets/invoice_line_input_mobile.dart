@@ -240,7 +240,9 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        color: context.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.4,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -321,7 +323,7 @@ class _Header extends StatelessWidget {
       margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withOpacity(0.4),
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -425,7 +427,7 @@ class _InvoiceLineCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colors.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -546,7 +548,6 @@ class _CustomTextField extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     this.suffix,
-    super.key,
   });
 
   @override
@@ -623,7 +624,7 @@ class _TotalBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: colors.primaryContainer.withOpacity(0.1),
+        color: colors.primaryContainer.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

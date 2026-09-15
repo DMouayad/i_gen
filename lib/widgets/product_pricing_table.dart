@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/constants.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/price_category.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/utils/context_extensions.dart';
+import 'package:i_gen/widgets/read_only_banner.dart';
 import 'package:trina_grid/trina_grid.dart';
 
 class ProductPricingTable extends StatefulWidget {
@@ -32,9 +36,18 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
   final textStyle = TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
   bool _disposed = false;
 
+  /// Role read-only mirror for renderers created outside build (title
+  /// editors, header actions). Fail-open while signed out so local editing
+  /// keeps working offline; the database remains the enforcer.
+  final ValueNotifier<bool> _readOnlyNotifier = ValueNotifier(false);
+  StreamSubscription<UserRole?>? _roleSub;
+  bool _gridReady = false;
+
   @override
   void dispose() {
     _disposed = true;
+    _roleSub?.cancel();
+    _readOnlyNotifier.dispose();
     super.dispose();
   }
 
@@ -61,6 +74,16 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
 
   @override
   void initState() {
+    super.initState();
+    final auth = AuthService.instance;
+    _readOnlyNotifier.value = auth.isSignedIn && !auth.canEditCatalog;
+    _roleSub = auth.currentRoleStream.listen((_) {
+      if (_disposed) return;
+      _readOnlyNotifier.value = auth.isSignedIn && !auth.canEditCatalog;
+      if (_gridReady) {
+        stateManager.setAutoEditing(!_readOnlyNotifier.value);
+      }
+    });
     columns.add(
       TrinaColumn(
         title: 'Model',
@@ -127,8 +150,6 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
         stateManager.setShowLoading(false);
       });
     });
-
-    super.initState();
   }
 
   Future<List<TrinaColumn>> fetchCols() async {
@@ -155,25 +176,32 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
               right: BorderSide(color: context.colorScheme.surfaceDim),
             ),
           ),
-          child: TextButton.icon(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => _EditPriceCategoryDialog(
-                  name: name,
-                  currency: currency,
-                  priceCategoryId: priceCategoryId,
-                  existingCategories: pricingCategories,
-                  rendererContext: rendererContext,
-                ),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _readOnlyNotifier,
+            builder: (context, readOnly, _) {
+              final label = Text(
+                '${rendererContext.column.title} (${currencies[currency]}) ',
+                style: textStyle,
+              );
+              if (readOnly) return Center(child: label);
+              return TextButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => _EditPriceCategoryDialog(
+                      name: name,
+                      currency: currency,
+                      priceCategoryId: priceCategoryId,
+                      existingCategories: pricingCategories,
+                      rendererContext: rendererContext,
+                    ),
+                  );
+                },
+                iconAlignment: IconAlignment.end,
+                label: label,
+                icon: Icon(Icons.edit),
               );
             },
-            iconAlignment: IconAlignment.end,
-            label: Text(
-              '${rendererContext.column.title} (${currencies[currency]}) ',
-              style: textStyle,
-            ),
-            icon: Icon(Icons.edit),
           ),
         );
       },
@@ -205,144 +233,187 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: context.isMobile ? context.width : 920,
-      ),
-      child: TrinaGrid(
-        columns: columns,
-        rows: [],
-        onChanged: (TrinaGridOnChangedEvent event) {
-          updateDirtyCount();
-          dirtyRows.add(event.rowIdx);
-
-          if (event.row.cells['status']!.value == 'saved') {
-            event.row.cells['status']!.value = 'edited';
-          }
-        },
-        configuration: TrinaGridConfiguration(
-          style: TrinaGridStyleConfig(
-            cellDirtyColor: Colors.amber[100]!,
-            borderColor: context.colorScheme.surfaceDim,
-            gridBorderColor: context.colorScheme.surfaceDim,
-            gridBorderRadius: BorderRadius.circular(6),
-            cellTextStyle: textStyle,
-            columnTextStyle: textStyle.copyWith(
-              color: context.colorScheme.primary,
-            ),
-            evenRowColor: Colors.white,
-            oddRowColor: context.colorScheme.surface,
+    return Stack(
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: context.isMobile ? context.width : 920,
           ),
-        ),
-        createHeader: (stateManager) {
-          return Container(
-            height: 70,
-            // width: 140,
-            alignment: Alignment.centerRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ValueListenableBuilder(
-                  valueListenable: widget.unsavedProductPricingCountNotifier,
-                  builder: (context, value, child) {
-                    return value <= 0
-                        ? SizedBox.shrink()
-                        : TextButton.icon(
-                            label: Text(
-                              'Save All',
-                              style: textStyle.copyWith(
-                                color: context.colorScheme.primary,
+          child: TrinaGrid(
+            columns: columns,
+            rows: [],
+            onChanged: (TrinaGridOnChangedEvent event) {
+              if (_readOnlyNotifier.value) return;
+              updateDirtyCount();
+              dirtyRows.add(event.rowIdx);
+
+              if (event.row.cells['status']!.value == 'saved') {
+                event.row.cells['status']!.value = 'edited';
+              }
+            },
+            configuration: TrinaGridConfiguration(
+              style: TrinaGridStyleConfig(
+                cellDirtyColor: Colors.amber[100]!,
+                borderColor: context.colorScheme.surfaceDim,
+                gridBorderColor: context.colorScheme.surfaceDim,
+                gridBorderRadius: BorderRadius.circular(6),
+                cellTextStyle: textStyle,
+                columnTextStyle: textStyle.copyWith(
+                  color: context.colorScheme.primary,
+                ),
+                evenRowColor: Colors.white,
+                oddRowColor: context.colorScheme.surface,
+              ),
+            ),
+            createHeader: (stateManager) {
+              return ValueListenableBuilder<bool>(
+                valueListenable: _readOnlyNotifier,
+                builder: (context, readOnly, _) {
+                  if (readOnly) return const SizedBox.shrink();
+                  return Container(
+                    height: 70,
+                    // width: 140,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ValueListenableBuilder(
+                          valueListenable:
+                              widget.unsavedProductPricingCountNotifier,
+                          builder: (context, value, child) {
+                            return value <= 0
+                                ? SizedBox.shrink()
+                                : TextButton.icon(
+                                    label: Text(
+                                      'Save All',
+                                      style: textStyle.copyWith(
+                                        color: context.colorScheme.primary,
+                                      ),
+                                    ),
+                                    icon: Icon(Icons.save),
+                                    onPressed: () async {
+                                      stateManager.setShowLoading(true);
+                                      for (final rowId in dirtyRows) {
+                                        var row = stateManager.refRows[rowId];
+                                        for (final cell in row.cells.values) {
+                                          if (cell.isDirty) {
+                                            final priceCategory =
+                                                pricingCategories.firstWhere(
+                                                  (element) =>
+                                                      element.name ==
+                                                      cell.column.title,
+                                                );
+                                            await GetIt.I
+                                                .get<ProductPricingRepo>()
+                                                .save(
+                                                  priceCategoryId:
+                                                      priceCategory.id,
+                                                  productId:
+                                                      products[row
+                                                              .cells['model']!
+                                                              .value]!
+                                                          .id,
+                                                  price: cell.value,
+                                                  currency:
+                                                      priceCategory.currency,
+                                                );
+                                          }
+                                          stateManager.commitChanges(
+                                            cell: cell,
+                                          );
+                                          stateManager
+                                                  .refRows[rowId]
+                                                  .cells['status']!
+                                                  .value =
+                                              'saved';
+                                        }
+                                      }
+                                      stateManager.setShowLoading(false);
+                                      dirtyRows.clear();
+                                      updateDirtyCount();
+                                    },
+                                  );
+                          },
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
+                                color: context.colorScheme.surfaceDim,
                               ),
                             ),
-                            icon: Icon(Icons.save),
+                          ),
+                          child: TextButton.icon(
                             onPressed: () async {
-                              stateManager.setShowLoading(true);
-                              for (final rowId in dirtyRows) {
-                                var row = stateManager.refRows[rowId];
-                                for (final cell in row.cells.values) {
-                                  if (cell.isDirty) {
-                                    final priceCategory = pricingCategories
-                                        .firstWhere(
-                                          (element) =>
-                                              element.name == cell.column.title,
-                                        );
-                                    await GetIt.I
-                                        .get<ProductPricingRepo>()
-                                        .save(
-                                          priceCategoryId: priceCategory.id,
-                                          productId:
-                                              products[row
-                                                      .cells['model']!
-                                                      .value]!
-                                                  .id,
-                                          price: cell.value,
-                                          currency: priceCategory.currency,
-                                        );
-                                  }
-                                  stateManager.commitChanges(cell: cell);
-                                  stateManager
-                                          .refRows[rowId]
-                                          .cells['status']!
-                                          .value =
-                                      'saved';
-                                }
+                              final currency = currencies.keys.first;
+
+                              final res = await showDialog(
+                                context: context,
+                                builder: (context) => _EditPriceCategoryDialog(
+                                  name: '',
+                                  currency: currency,
+                                  existingCategories: pricingCategories,
+                                ),
+                              );
+                              if (res case (
+                                int id,
+                                String name,
+                                String currency,
+                              )) {
+                                final index = stateManager.refColumns.length;
+                                final newCol = _getColumn(name, currency);
+                                stateManager.insertColumns(index, [newCol]);
+                                pricingCategories.add(
+                                  PriceCategory(
+                                    id: id,
+                                    name: name,
+                                    currency: currency,
+                                  ),
+                                );
                               }
-                              stateManager.setShowLoading(false);
-                              dirtyRows.clear();
-                              updateDirtyCount();
                             },
-                          );
-                  },
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: context.colorScheme.surfaceDim),
-                    ),
-                  ),
-                  child: TextButton.icon(
-                    onPressed: () async {
-                      final currency = currencies.keys.first;
-
-                      final res = await showDialog(
-                        context: context,
-                        builder: (context) => _EditPriceCategoryDialog(
-                          name: '',
-                          currency: currency,
-                          existingCategories: pricingCategories,
+                            label: Text(
+                              'New List',
+                              style: textStyle.copyWith(
+                                // color: context.colorScheme.primary,
+                              ),
+                            ),
+                            icon: Icon(Icons.add_box),
+                          ),
                         ),
-                      );
-                      if (res case (int id, String name, String currency)) {
-                        final index = stateManager.refColumns.length;
-                        final newCol = _getColumn(name, currency);
-                        stateManager.insertColumns(index, [newCol]);
-                        pricingCategories.add(
-                          PriceCategory(id: id, name: name, currency: currency),
-                        );
-                      }
-                    },
-                    label: Text(
-                      'New List',
-                      style: textStyle.copyWith(
-                        // color: context.colorScheme.primary,
-                      ),
+                      ],
                     ),
-                    icon: Icon(Icons.add_box),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-        onLoaded: (TrinaGridOnLoadedEvent event) {
-          stateManager = event.stateManager;
+                  );
+                },
+              );
+            },
+            onLoaded: (TrinaGridOnLoadedEvent event) {
+              stateManager = event.stateManager;
 
-          /// When the grid is finished loading, enable loading.
-          stateManager.setChangeTracking(true);
-          stateManager.setAutoEditing(true);
-          stateManager.setShowLoading(true);
-        },
-      ),
+              /// When the grid is finished loading, enable loading.
+              stateManager.setChangeTracking(true);
+              stateManager.setAutoEditing(!_readOnlyNotifier.value);
+              stateManager.setShowLoading(true);
+              _gridReady = true;
+            },
+          ),
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: _readOnlyNotifier,
+          builder: (context, readOnly, _) {
+            if (!readOnly) return const SizedBox.shrink();
+            return const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ReadOnlyBanner(
+                text:
+                    'Pricing is read-only for your role — ask an admin for changes.',
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

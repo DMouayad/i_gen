@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/product.dart';
 import 'package:i_gen/utils/context_extensions.dart';
+import 'package:i_gen/widgets/read_only_banner.dart';
 
 class ProductsScreeMobile extends StatefulWidget {
   const ProductsScreeMobile({
@@ -78,61 +80,81 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
     final textStyle = context.isMobile
         ? context.textTheme.titleMedium
         : context.textTheme.titleLarge;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Products'),
-        backgroundColor: context.theme.scaffoldBackgroundColor,
-        surfaceTintColor: context.colorScheme.surface,
-        actionsPadding: EdgeInsets.symmetric(horizontal: 4),
-        actions: [
-          TextButton.icon(
-            style: ButtonStyle(
-              minimumSize: context.isMobile
-                  ? null
-                  : WidgetStatePropertyAll(Size(200, 55)),
-            ),
-            label: Text('New Product', style: textStyle),
-            icon: Icon(Icons.add),
-            onPressed: _showEditDialog,
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 1020),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    labelText: 'Search',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
+    final auth = AuthService.instance;
+    return StreamBuilder<UserRole?>(
+      stream: auth.currentRoleStream,
+      initialData: auth.currentRole,
+      builder: (context, snapshot) {
+        // Fail-open while signed out: local editing keeps working offline;
+        // the database remains the enforcer for signed-in roles.
+        final readOnly = auth.isSignedIn && !auth.canEditCatalog;
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Products'),
+            backgroundColor: context.theme.scaffoldBackgroundColor,
+            surfaceTintColor: context.colorScheme.surface,
+            actionsPadding: EdgeInsets.symmetric(horizontal: 4),
+            actions: [
+              if (!readOnly)
+                TextButton.icon(
+                  style: ButtonStyle(
+                    minimumSize: context.isMobile
+                        ? null
+                        : WidgetStatePropertyAll(Size(200, 55)),
                   ),
+                  label: Text('New Product', style: textStyle),
+                  icon: Icon(Icons.add),
+                  onPressed: _showEditDialog,
                 ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: _filteredProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = _filteredProducts[index];
-                    return ProductListItem(
-                      product: product,
-                      onDelete: () => _deleteProduct(product),
-                      onEdit: () => _showEditDialog(product: product),
-                    );
-                  },
-                ),
-              ),
             ],
           ),
-        ),
-      ),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 1020),
+              child: Column(
+                children: [
+                  if (readOnly)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(8, 8, 8, 0),
+                      child: ReadOnlyBanner(
+                        text:
+                            'Catalog is read-only for your role — ask an admin for changes.',
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        labelText: 'Search',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: _filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        final product = _filteredProducts[index];
+                        return ProductListItem(
+                          product: product,
+                          showActions: !readOnly,
+                          onDelete: () => _deleteProduct(product),
+                          onEdit: () => _showEditDialog(product: product),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -142,11 +164,15 @@ class ProductListItem extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onEdit;
 
+  /// When false the edit/delete buttons are hidden (role read-only).
+  final bool showActions;
+
   const ProductListItem({
     super.key,
     required this.product,
     required this.onDelete,
     required this.onEdit,
+    this.showActions = true,
   });
 
   @override
@@ -158,7 +184,7 @@ class ProductListItem extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 2.0),
-      color: context.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+      color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
 
       shape: RoundedRectangleBorder(
         side: BorderSide(width: 0.5, color: context.colorScheme.outline),
@@ -174,8 +200,10 @@ class ProductListItem extends StatelessWidget {
                 style: titleStyle,
               ),
             ),
-            IconButton(icon: Icon(Icons.edit), onPressed: onEdit),
-            IconButton(icon: Icon(Icons.delete), onPressed: onDelete),
+            if (showActions) ...[
+              IconButton(icon: Icon(Icons.edit), onPressed: onEdit),
+              IconButton(icon: Icon(Icons.delete), onPressed: onDelete),
+            ],
           ],
         ),
       ),
