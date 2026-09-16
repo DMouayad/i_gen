@@ -4,9 +4,11 @@ import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/order_by.dart';
 import 'package:i_gen/repos/invoice_repo.dart';
+import 'package:i_gen/repos/sync_trigger.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
+import 'package:i_gen/widgets/sync_spinner.dart';
 import 'package:intl/intl.dart';
 
 class ArchiveScreen extends StatefulWidget {
@@ -22,105 +24,170 @@ typedef SortItem = (String, OrderBy?);
 class _ArchiveScreenState extends State<ArchiveScreen> {
   List<Invoice> invoices = [];
   bool isLoading = false;
+  Object? loadError;
   OrderBy? orderBy = OrderBy('date', false);
 
-  void handleOnSorted() async {
-    if (orderBy != null) {
+  Future<void> _load() async {
+    setState(() {
+      isLoading = true;
+      loadError = null;
+    });
+    try {
       invoices = await GetIt.I.get<InvoiceRepo>().getInvoices(orderBy);
-      setState(() {});
+    } catch (e) {
+      loadError = e;
     }
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void handleOnSorted() async {
+    await _load();
+  }
+
+  /// Pull-to-refresh: run a sync, then reload invoices from the repo.
+  Future<void> _refresh() async {
+    await SyncTrigger.instance.syncNow();
+    await _load();
   }
 
   @override
   void initState() {
-    setState(() {
-      isLoading = true;
-    });
-    GetIt.I.get<InvoiceRepo>().getInvoices(orderBy).then((items) {
-      invoices = items;
-      setState(() {
-        isLoading = false;
-      });
-    });
     super.initState();
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(maxWidth: 1024),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(top: 30),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: OverflowBar(
-                alignment: MainAxisAlignment.start,
-                children: [
-                  Text('SORT'),
-                  SizedBox(width: 10),
-                  DropdownButton<OrderBy?>(
-                    value: orderBy,
-                    hint: Text('Sort'),
-                    items: [
-                      DropdownMenuItem(
-                        value: OrderBy('customer', true),
-                        child: Text('From A-Z'),
-                      ),
-                      DropdownMenuItem(
-                        value: OrderBy('customer', false),
-                        child: Text('From Z-A'),
-                      ),
-                      DropdownMenuItem(
-                        value: OrderBy('date', false),
-                        child: Text('From Newest'),
-                      ),
-                      DropdownMenuItem(
-                        value: OrderBy('date', true),
-                        child: Text('From Oldest'),
-                      ),
-                      DropdownMenuItem(value: null, child: Text('None')),
-                    ],
-                    onChanged: (value) async {
-                      if (value != null) {
+      constraints: const BoxConstraints(maxWidth: 1024),
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: AppGaps.xl),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppGaps.md),
+                child: OverflowBar(
+                  alignment: MainAxisAlignment.start,
+                  children: [
+                    Text(context.l10n.sortLabel),
+                    const SizedBox(width: AppGaps.sm),
+                    DropdownButton<OrderBy?>(
+                      value: orderBy,
+                      hint: Text(context.l10n.sortLabel),
+                      items: [
+                        DropdownMenuItem(
+                          value: OrderBy('customer', true),
+                          child: Text(context.l10n.sortAz),
+                        ),
+                        DropdownMenuItem(
+                          value: OrderBy('customer', false),
+                          child: Text(context.l10n.sortZa),
+                        ),
+                        DropdownMenuItem(
+                          value: OrderBy('date', false),
+                          child: Text(context.l10n.sortNewest),
+                        ),
+                        DropdownMenuItem(
+                          value: OrderBy('date', true),
+                          child: Text(context.l10n.sortOldest),
+                        ),
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text(context.l10n.sortNone),
+                        ),
+                      ],
+                      onChanged: (value) async {
                         orderBy = value;
                         handleOnSorted();
-                      }
-                    },
-                  ),
-                ],
+                      },
+                    ),
+                    const SyncSpinner(),
+                  ],
+                ),
               ),
-            ),
 
-            (isLoading)
-                ? CircularProgressIndicator()
-                : invoices.isEmpty
-                ? Text('No invoices found')
-                : Container(
-                    padding: EdgeInsets.symmetric(vertical: 50),
-                    height: context.height,
-                    width: 1000,
-                    child: ListView.separated(
-                      itemCount: invoices.length,
-                      separatorBuilder: (context, index) => SizedBox(height: 5),
-                      itemBuilder: (context, index) => _Item(
-                        invoice: invoices[index],
-                        onInvoiceSelected: (invoiceController) {
-                          widget.onLoaded(invoiceController);
-                        },
-                        onSaved: (newInvoice) {
-                          setState(() => invoices[index] = newInvoice);
-                        },
-                        onDeleted: () {
-                          setState(() {
-                            invoices.remove(invoices[index]);
-                          });
-                        },
+              (isLoading)
+                  ? const CircularProgressIndicator()
+                  : (loadError != null)
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          context.l10n.unexpectedError(loadError.toString()),
+                        ),
+                        const SizedBox(height: AppGaps.sm),
+                        OutlinedButton(
+                          style: const ButtonStyle(
+                            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                          ),
+                          onPressed: _load,
+                          child: Text(context.l10n.retry),
+                        ),
+                      ],
+                    )
+                  : invoices.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(AppGaps.lg),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.archive_outlined,
+                            size: 48,
+                            color: context.colorScheme.outline,
+                          ),
+                          const SizedBox(height: AppGaps.sm),
+                          Text(
+                            context.l10n.noInvoicesFound,
+                            textAlign: TextAlign.center,
+                            style: context.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppGaps.sm),
+                          Text(
+                            context.l10n.archiveEmptyHint,
+                            textAlign: TextAlign.center,
+                            style: context.textTheme.bodyMedium?.copyWith(
+                              color: context.colorScheme.outline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(AppGaps.md),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: invoices.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: AppGaps.sm),
+                        itemBuilder: (context, index) => _Item(
+                          invoice: invoices[index],
+                          onInvoiceSelected: (invoiceController) {
+                            widget.onLoaded(invoiceController);
+                          },
+                          onSaved: (newInvoice) {
+                            setState(() => invoices[index] = newInvoice);
+                          },
+                          onDeleted: () {
+                            setState(() {
+                              invoices.remove(invoices[index]);
+                            });
+                          },
+                        ),
                       ),
                     ),
-                  ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -147,9 +214,12 @@ class _Item extends StatelessWidget {
       child: ListTile(
         shape: RoundedRectangleBorder(
           side: BorderSide(color: context.colorScheme.surfaceDim),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(AppRadii.card),
         ),
-        contentPadding: EdgeInsets.symmetric(vertical: 7, horizontal: 20),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: AppGaps.sm,
+          horizontal: AppGaps.md,
+        ),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -177,30 +247,56 @@ class _Item extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        trailing: SizedBox(
-          width: 150,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                DateFormat.yMd().format(invoice.date),
-                style: context.textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              DateFormat.yMd().format(invoice.date),
+              style: context.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
-              TextButton.icon(
-                onPressed: () async {
-                  await GetIt.I.get<InvoiceRepo>().delete(invoice);
-                  onDeleted();
-                },
-                label: Text('Delete', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
+            ),
+            IconButton(
+              tooltip: context.l10n.delete,
+              color: context.colorScheme.error,
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.dialog),
+                    ),
+                    title: Text(context.l10n.deleteConfirmTitle),
+                    content: Text(context.l10n.deleteConfirmMessage),
+                    actions: [
+                      TextButton(
+                        style: const ButtonStyle(
+                          minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: Text(context.l10n.cancelButton),
+                      ),
+                      FilledButton(
+                        style: const ButtonStyle(
+                          minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: Text(context.l10n.delete),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !context.mounted) return;
+                await GetIt.I.get<InvoiceRepo>().delete(invoice);
+                onDeleted();
+              },
+            ),
+          ],
         ),
         dense: false,
         subtitle: Padding(
-          padding: const EdgeInsets.only(top: 5.0),
+          padding: const EdgeInsets.only(top: AppGaps.xs),
           child: Text(
             invoice.lines
                 .map((e) => '${e.product.model}:${e.amount}')

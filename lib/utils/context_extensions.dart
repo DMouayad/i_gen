@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:i_gen/l10n/app_localizations.dart';
 
+abstract final class AppGaps {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+}
+
+abstract final class AppRadii {
+  static const double control = 8;
+  static const double card = 16;
+  static const double dialog = 12;
+}
+
 extension ScreenExtensions on BuildContext {
   double get width => MediaQuery.of(this).size.width;
   double get height => MediaQuery.of(this).size.height;
@@ -16,7 +30,7 @@ extension TextStylesExtensions on BuildContext {
   TextStyle get errorTextStyle => TextStyle(color: colorScheme.error);
   TextStyle get defaultTextStyle => textTheme.bodyLarge!.copyWith(
     fontWeight: FontWeight.w600,
-    color: Colors.black,
+    color: colorScheme.onSurface,
   );
   ThemeData get theme => Theme.of(this);
   TextTheme get textTheme => TextTheme.of(this);

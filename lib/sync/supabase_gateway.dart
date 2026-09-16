@@ -53,7 +53,11 @@ class SupabaseGateway implements RemoteGateway {
           .select('id,updated_at')
           .single();
     } else {
+      // Update path: identity columns are server-owned after insert.
+      // client_op_id already matched the row; owner_id must never move
+      // (an admin edit would otherwise steal row ownership).
       payload.remove('client_op_id');
+      payload.remove('owner_id');
       saved = await _client
           .from(remoteTable)
           .update(payload)
@@ -93,7 +97,12 @@ class SupabaseGateway implements RemoteGateway {
     required String ownerId,
     required int? lastPullAtMillis,
   }) async {
-    var query = _client.from(remoteTable).select().eq('owner_id', ownerId);
+    // Company-visible reads: the RLS policies are the lock (staff share all
+    // business rows, distributors see none of the catalog), so the client
+    // must NOT narrow to owner_id — that filter hid other users' catalog
+    // rows and starved multi-user devices. [ownerId] is still required
+    // (login-gated reads) but only audit from here on.
+    var query = _client.from(remoteTable).select();
     if (lastPullAtMillis != null) {
       query = query.gt('updated_at', _asIso(lastPullAtMillis));
     }

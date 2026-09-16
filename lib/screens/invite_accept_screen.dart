@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:i_gen/auth/auth_exceptions.dart';
 import 'package:i_gen/auth/invite_service.dart';
+import 'package:i_gen/utils/context_extensions.dart';
 
 /// Handles one invite/recovery link end to end: verifies it, collects the
 /// password when the link established a fresh session, and reports the
@@ -19,7 +20,11 @@ class _InviteAcceptScreenState extends State<InviteAcceptScreen> {
   final _password = TextEditingController();
   bool _busy = false;
   bool _needsPassword = false;
-  String? _message;
+  // _accept() runs from initState where AppLocalizations isn't ready, so
+  // localizable outcomes are stored as keys and resolved in build();
+  // _rawError carries server/exception text shown as-is.
+  String? _messageKey;
+  String? _rawError;
   bool _done = false;
 
   @override
@@ -37,23 +42,24 @@ class _InviteAcceptScreenState extends State<InviteAcceptScreen> {
   Future<void> _accept() async {
     setState(() {
       _busy = true;
-      _message = null;
+      _messageKey = null;
+      _rawError = null;
     });
     try {
       final needsPassword = await InviteService().acceptLink(widget.link);
       if (!mounted) return;
       setState(() {
         _needsPassword = needsPassword;
-        _message = needsPassword
-            ? 'Link accepted — choose a password to finish.'
-            : 'Link accepted — now sign in with your new password.';
+        _messageKey = needsPassword
+            ? 'inviteLinkAcceptedChoosePassword'
+            : 'inviteLinkAcceptedSignIn';
       });
     } on AuthFailureException catch (e) {
       if (!mounted) return;
-      setState(() => _message = e.message);
+      setState(() => _rawError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _message = 'Could not accept the link — try again.');
+      setState(() => _messageKey = 'inviteLinkAcceptFailed');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -62,7 +68,8 @@ class _InviteAcceptScreenState extends State<InviteAcceptScreen> {
   Future<void> _setPassword() async {
     setState(() {
       _busy = true;
-      _message = null;
+      _messageKey = null;
+      _rawError = null;
     });
     try {
       await InviteService().setPassword(_password.text);
@@ -70,11 +77,11 @@ class _InviteAcceptScreenState extends State<InviteAcceptScreen> {
       setState(() {
         _needsPassword = false;
         _done = true;
-        _message = 'Password set — sign in with your email and password.';
+        _messageKey = 'invitePasswordSetDone';
       });
     } on AuthFailureException catch (e) {
       if (!mounted) return;
-      setState(() => _message = e.message);
+      setState(() => _rawError = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -82,35 +89,90 @@ class _InviteAcceptScreenState extends State<InviteAcceptScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String? messageText =
+        _rawError ??
+        switch (_messageKey) {
+          'inviteLinkAcceptedChoosePassword' =>
+            context.l10n.inviteLinkAcceptedChoosePassword,
+          'inviteLinkAcceptedSignIn' => context.l10n.inviteLinkAcceptedSignIn,
+          'inviteLinkAcceptFailed' => context.l10n.inviteLinkAcceptFailed,
+          'invitePasswordSetDone' => context.l10n.invitePasswordSetDone,
+          _ => null,
+        };
+    final bool hasMessage = messageText != null;
+    final bool isError =
+        _rawError != null || _messageKey == 'inviteLinkAcceptFailed';
     return Scaffold(
-      appBar: AppBar(title: const Text('Accept invitation')),
+      appBar: AppBar(title: Text(context.l10n.acceptInvitationTitle)),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppGaps.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_busy && _message == null)
+            if (_busy && !hasMessage)
               const Center(child: CircularProgressIndicator()),
-            if (_message != null) Text(_message!),
+            if (messageText != null)
+              Row(
+                children: [
+                  if (isError)
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppGaps.sm),
+                      child: Icon(
+                        Icons.error_outline,
+                        color: context.colorScheme.error,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      messageText,
+                      style: isError
+                          ? context.textTheme.bodyMedium?.copyWith(
+                              color: context.colorScheme.error,
+                            )
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
             if (_needsPassword && !_busy) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppGaps.md),
               TextField(
                 controller: _password,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Choose password'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.choosePasswordLabel,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                  ),
+                ),
                 enabled: !_busy,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppGaps.md),
               FilledButton.tonal(
+                style: const ButtonStyle(
+                  minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                ),
                 onPressed: _busy ? null : _setPassword,
-                child: const Text('Set password'),
+                child: Text(context.l10n.setPasswordButton),
               ),
             ],
-            if (!_busy && (_done || (_message != null && !_needsPassword))) ...[
-              const SizedBox(height: 12),
+            if (!_busy && (_done || (hasMessage && !_needsPassword))) ...[
+              const SizedBox(height: AppGaps.md),
+              if (isError)
+                OutlinedButton(
+                  style: const ButtonStyle(
+                    minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                  ),
+                  onPressed: _accept,
+                  child: Text(context.l10n.retry),
+                ),
+              if (isError) const SizedBox(height: AppGaps.md),
               OutlinedButton(
+                style: const ButtonStyle(
+                  minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                ),
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Done'),
+                child: Text(context.l10n.done),
               ),
             ],
           ],

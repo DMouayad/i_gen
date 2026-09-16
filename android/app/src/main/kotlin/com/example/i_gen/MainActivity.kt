@@ -1,4 +1,4 @@
-package com.example.i_gen
+package com.mouayad_alhamwi.i_gen
 
 import io.flutter.embedding.android.FlutterActivity
 

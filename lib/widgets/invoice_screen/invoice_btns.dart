@@ -16,8 +16,10 @@ class InvoiceBtns extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filledBtnStyle = ButtonStyle(
-      minimumSize: WidgetStatePropertyAll(Size(130, 54)),
-      textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 18)),
+      minimumSize: const WidgetStatePropertyAll(Size(128, 56)),
+      textStyle: WidgetStatePropertyAll(
+        context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
     );
 
     return ValueListenableBuilder(
@@ -27,8 +29,8 @@ class InvoiceBtns extends StatelessWidget {
           firstChild: OverflowBar(
             alignment: MainAxisAlignment.center,
             overflowAlignment: OverflowBarAlignment.center,
-            spacing: 10,
-            overflowSpacing: 30,
+            spacing: AppGaps.sm,
+            overflowSpacing: AppGaps.xl,
             children: [
               if (Navigator.of(context).canPop()) ...[
                 FilledButton.tonal(
@@ -36,7 +38,7 @@ class InvoiceBtns extends StatelessWidget {
                     Navigator.of(context).pop();
                   },
                   style: filledBtnStyle,
-                  child: Text('Go back'),
+                  child: Text(context.l10n.goBack),
                 ),
               ],
               ValueListenableBuilder(
@@ -49,8 +51,10 @@ class InvoiceBtns extends StatelessWidget {
                       overflowAlignment: OverflowBarAlignment.center,
                       children: [
                         Text(
-                          "Text Size is ${value.floor()}",
-                          style: TextStyle(fontSize: 18),
+                          context.l10n.textSizeLabel(value.floor()),
+                          style: context.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         Slider(
                           min: 10,
@@ -74,7 +78,7 @@ class InvoiceBtns extends StatelessWidget {
                     controller.hasUnsavedChanges = false;
                   }
                 },
-                label: Text('Save'),
+                label: Text(context.l10n.saveButton),
                 icon: Icon(Icons.save),
                 style: filledBtnStyle,
               ),
@@ -83,8 +87,8 @@ class InvoiceBtns extends StatelessWidget {
           secondChild: OverflowBar(
             alignment: MainAxisAlignment.center,
             overflowAlignment: OverflowBarAlignment.end,
-            spacing: 10,
-            overflowSpacing: 30,
+            spacing: AppGaps.sm,
+            overflowSpacing: AppGaps.xl,
             children: [
               if (Navigator.of(context).canPop())
                 FilledButton.tonal(
@@ -92,27 +96,30 @@ class InvoiceBtns extends StatelessWidget {
                     Navigator.of(context).pop();
                   },
                   style: filledBtnStyle,
-                  child: Text('Go back'),
+                  child: Text(context.l10n.goBack),
                 ),
               OutlinedButton.icon(
                 onPressed: () {
                   controller.enableEditing = true;
                   controller.hasUnsavedChanges = true;
                 },
-                label: Text('Edit', style: context.defaultTextStyle),
+                label: Text(
+                  context.l10n.editButton,
+                  style: context.defaultTextStyle,
+                ),
                 icon: Icon(Icons.edit),
                 style: filledBtnStyle,
               ),
 
               FilledButton.icon(
                 onPressed: onExportAsImage,
-                label: Text('Export As Image'),
+                label: Text(context.l10n.exportAsImage),
                 icon: Icon(Icons.image),
                 style: filledBtnStyle,
               ),
               FilledButton.icon(
                 onPressed: onExportAsPdf,
-                label: Text('Export As PDF'),
+                label: Text(context.l10n.exportAsPdf),
                 icon: Icon(Icons.file_open_rounded),
                 style: filledBtnStyle,
               ),

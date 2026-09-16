@@ -8,7 +8,7 @@ import 'package:i_gen/utils/context_extensions.dart';
 class InvoiceCustomerInfo extends StatelessWidget {
   const InvoiceCustomerInfo(
     this.controller, {
-    this.verticalPadding = 30,
+    this.verticalPadding = AppGaps.xl,
     super.key,
   });
 
@@ -17,7 +17,10 @@ class InvoiceCustomerInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 5.0, vertical: verticalPadding),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppGaps.xs,
+        vertical: verticalPadding,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -27,9 +30,9 @@ class InvoiceCustomerInfo extends StatelessWidget {
                 bottom: BorderSide(color: context.colorScheme.surfaceDim),
               ),
             ),
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: AppGaps.sm),
             alignment: Alignment.center,
-            child: Text('BILL TO', style: context.defaultTextStyle),
+            child: Text(context.l10n.billTo, style: context.defaultTextStyle),
           ),
           TypeAheadField<String>(
             controller: controller.customerNameController,
@@ -56,13 +59,13 @@ class InvoiceCustomerInfo extends StatelessWidget {
                     controller.customerName = value;
                   },
 
-                  style: context.defaultTextStyle.copyWith(fontSize: 22),
+                  style: context.defaultTextStyle,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderSide: BorderSide.none,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.control),
                     ),
-                    hintText: 'Customer name',
+                    hintText: context.l10n.customerNameHint,
                   ),
                 ),
               );

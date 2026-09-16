@@ -1,10 +1,325 @@
 {
     "@@locale": "en",
     "productModel": "Model",
+    "@productModel": { "description": "Product model name column header" },
     "productDescription": "Description",
+    "@productDescription": { "description": "Product description column header" },
     "quantity": "Quantity",
+    "@quantity": { "description": "Quantity column header" },
     "price": "Price",
+    "@price": { "description": "Unit price column header" },
     "lineTotal": "Line Total",
+    "@lineTotal": { "description": "Line total column header" },
     "total": "Total",
-    "addItem": "Add Item"
+    "@total": { "description": "Invoice total label" },
+    "addItem": "Add Item",
+    "@addItem": { "description": "Button to add an invoice line item" },
+
+    "sortLabel": "SORT",
+    "sortAz": "From A-Z",
+    "sortZa": "From Z-A",
+    "sortNewest": "From Newest",
+    "sortOldest": "From Oldest",
+    "sortNone": "None",
+    "noInvoicesFound": "No invoices found",
+    "archiveEmptyHint": "Saved invoices will appear here.",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete?",
+    "deleteConfirmMessage": "This cannot be undone.",
+
+    "invoiceUnsavedTitle": "Invoice was not saved",
+    "invoiceUnsavedMessage": "Your invoice has unsaved changes, do you want to continue?",
+    "unsavedProductsTitle": "Unsaved Products",
+    "unsavedProductsMessage": "You have unsaved products, do you want to continue?",
+    "unsavedPricingCategoryTitle": "Unsaved Pricing Category",
+    "unsavedPricingCategoryMessage": "You have unsaved pricing category, do you want to continue?",
+    "unsavedProductPricingTitle": "Unsaved Product Pricing",
+    "unsavedProductPricingMessage": "You have unsaved product pricing, do you want to continue?",
+    "navInvoices": "Invoices",
+    "navProducts": "Products",
+    "navPricing": "Pricing",
+    "navOrders": "Orders",
+    "navSettings": "Settings",
+    "notFoundLabel": "404",
+    "dialogYes": "Yes",
+    "dialogNo": "No",
+
+    "inviteLinkAcceptedChoosePassword": "Link accepted — choose a password to finish.",
+    "inviteLinkAcceptedSignIn": "Link accepted — now sign in with your new password.",
+    "inviteLinkAcceptFailed": "Could not accept the link — try again.",
+    "invitePasswordSetDone": "Password set — sign in with your email and password.",
+    "acceptInvitationTitle": "Accept invitation",
+    "choosePasswordLabel": "Choose password",
+    "setPasswordButton": "Set password",
+    "done": "Done",
+
+    "save": "Save",
+    "edit": "Edit",
+    "exportImage": "Export Image",
+    "exportPdf": "Export PDF",
+    "invoiceTitle": "INVOICE",
+
+    "ordersNeedSyncConfig": "Orders need sync configuration — the app works offline.",
+    "ordersSignInPrompt": "Sign in from Settings to view orders.",
+    "ordersDistributorGuidance": "Distributors place and follow orders in the web app — open your welcome link to continue there.",
+    "distributors": "Distributors",
+    "noConnectionOrders": "No connection — connect to view live orders.",
+    "couldNotLoadOrders": "Could not load orders: {error}",
+    "@couldNotLoadOrders": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "noOrdersYet": "No orders yet.",
+    "orderAmountTitle": "{total} {currency}",
+    "@orderAmountTitle": {
+        "placeholders": {
+            "total": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "newOrderChannelName": "New orders",
+    "newOrderChannelDescription": "Alerts when a distributor places an order.",
+    "newOrderTitle": "New order",
+    "newOrderBody": "{total} {currency}",
+    "@newOrderBody": {
+        "placeholders": {
+            "total": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "orderSubtitle": "{status} · {date}",
+    "@orderSubtitle": {
+        "placeholders": {
+            "status": { "type": "String" },
+            "date": { "type": "String" }
+        }
+    },
+    "filterAll": "All",
+    "orderStatusPending": "pending",
+    "orderStatusConfirmed": "confirmed",
+    "orderStatusDelivered": "delivered",
+    "orderStatusCancelled": "cancelled",
+    "noConnectionShort": "No connection.",
+    "unexpectedError": "{error}",
+    "@unexpectedError": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "orderDetailTitle": "Order · {status}",
+    "@orderDetailTitle": {
+        "placeholders": { "status": { "type": "String" } }
+    },
+    "orderNoLines": "No lines on this order.",
+    "orderItemAmount": "×{amount}",
+    "@orderItemAmount": {
+        "placeholders": { "amount": { "type": "String" } }
+    },
+    "close": "Close",
+    "noConnectionDistributors": "No connection — connect to view distributors.",
+    "couldNotLoadDistributors": "Could not load distributors: {error}",
+    "@couldNotLoadDistributors": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "noDistributorsYet": "No distributors yet — invite one from Settings.",
+
+    "productIdColumn": "ID",
+    "productAlreadyExists": "A product with model {model} already exists",
+    "@productAlreadyExists": {
+        "placeholders": { "model": { "type": "String" } }
+    },
+    "productNameColumn": "Name",
+    "productActionsColumn": "Actions",
+    "addProduct": "Add Product",
+    "unsavedProductsCount": "You have {count} unsaved products",
+    "@unsavedProductsCount": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "catalogReadOnly": "Catalog is read-only for your role — ask an admin for changes.",
+    "newProduct": "New Product",
+    "editProduct": "Edit Product",
+    "searchLabel": "Search",
+    "productModelRequired": "Please enter a model",
+    "productNameRequired": "Please enter a name",
+    "cancelButton": "Cancel",
+
+    "settingsOfflineFirstNote": "Your edits are saved on this device first and sync when you are online and signed in.",
+    "settingsStagingNote": "Your edits are saved on this device. Sync activates after the staging checklist passes.",
+    "syncNotConfigured": "Sync not configured",
+    "syncNotConfiguredHint": "The app works fully offline. Add Supabase credentials to enable sign-in.",
+    "signedInFallback": "Signed in",
+    "syncAccountNote": "Your edits sync to this account.",
+    "syncAccountRoleNote": "Your edits sync to this account. Role: {role}.",
+    "@syncAccountRoleNote": {
+        "placeholders": { "role": { "type": "String" } }
+    },
+    "signOut": "Sign out",
+    "signInToSync": "Sign in to sync",
+    "signInInviteHint": "Accounts are created by your admin — ask for a WhatsApp invite link.",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "signInAction": "Sign in",
+    "haveInviteLinkTitle": "Have an invite link? Paste it to set your password.",
+    "inviteLinkFieldLabel": "WhatsApp invite link",
+    "inviteLinkFieldHint": "Paste the full link here",
+    "acceptInviteLink": "Accept invite link",
+    "loginPreview": "Login preview: {slug}@",
+    "@loginPreview": {
+        "placeholders": { "slug": { "type": "String" } }
+    },
+    "inviteUsersTitle": "Invite users",
+    "inviteUsersHint": "Send the generated link over WhatsApp. The user sets their own password — nothing secret stays in chat.",
+    "nameArabicLabel": "Name (Arabic)",
+    "nameEnglishLabel": "Name (English)",
+    "phoneWhatsappLabel": "Phone (WhatsApp)",
+    "roleFieldLabel": "Role",
+    "roleEmployee": "Employee",
+    "roleDistributor": "Distributor",
+    "inviteActionLabel": "Action",
+    "inviteModeNew": "New invite",
+    "inviteModeResend": "Resend link",
+    "inviteModeRecovery": "Reset password",
+    "loginEmailLabel": "Login: {email}",
+    "@loginEmailLabel": {
+        "placeholders": { "email": { "type": "String" } }
+    },
+    "inviteShareText": "Your account: {email}\\nOpen this link to set your password:\\n{link}",
+    "@inviteShareText": {
+        "placeholders": {
+            "email": { "type": "String" },
+            "link": { "type": "String" }
+        }
+    },
+    "inviteCopiedHint": "Copied — forward it over WhatsApp.",
+    "copyForWhatsapp": "Copy for WhatsApp",
+    "createInviteLink": "Create invite link",
+    "resendInviteLink": "Resend invite link",
+    "sendPasswordResetLink": "Send password-reset link",
+
+    "newInvoice": "New invoice",
+    "saveButton": "Save",
+    "previewButton": "Preview",
+    "grandTotal": "Grand total: {value}",
+    "@grandTotal": {
+        "placeholders": { "value": { "type": "num" } }
+    },
+    "invoiceSaved": "Invoice saved · {value}",
+    "@invoiceSaved": {
+        "placeholders": { "value": { "type": "num" } }
+    },
+    "customerNameHint": "Customer name",
+
+    "discount": "Discount",
+    "itemsCount": "Items ({count})",
+    "@itemsCount": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "customPriceList": "Custom ({currency})",
+    "@customPriceList": {
+        "placeholders": { "currency": { "type": "String" } }
+    },
+    "priceCategoryOption": "{name} ({currency})",
+    "@priceCategoryOption": {
+        "placeholders": {
+            "name": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "removeButton": "Remove",
+    "searchProductHint": "Search product...",
+    "productSuggestion": "{model}: {name}",
+    "@productSuggestion": {
+        "placeholders": {
+            "model": { "type": "String" },
+            "name": { "type": "String" }
+        }
+    },
+    "noProductsFound": "No products found",
+
+    "goBack": "Go back",
+    "textSizeLabel": "Text Size is {size}",
+    "@textSizeLabel": {
+        "placeholders": { "size": { "type": "int" } }
+    },
+    "editButton": "Edit",
+    "exportAsImage": "Export As Image",
+    "exportAsPdf": "Export As PDF",
+    "billTo": "BILL TO",
+    "thankYouNote": "Thank you for your business",
+    "unitPrice": "Unit Price",
+    "subtotal": "Subtotal",
+    "selectPriceList": "Select price list",
+
+    "discardChangesTitle": "Discard Changes?",
+    "discardChangesMessage": "You have unsaved changes. Are you sure you want to discard them?",
+    "keepEditing": "Keep Editing",
+    "discardButton": "Discard",
+
+    "priceCategoryColumnTitle": "{title} ({currency})",
+    "@priceCategoryColumnTitle": {
+        "placeholders": {
+            "title": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "saveAllButton": "Save All",
+    "newPriceList": "New List",
+    "pricingReadOnlyMessage": "Pricing is read-only for your role — ask an admin for changes.",
+    "editOrDeleteList": "Edit or Delete this list",
+    "deleteButton": "Delete",
+    "priceCategoryNameLabel": "Name",
+    "priceCategoryNameHint": "Enter name",
+    "nameRequiredError": "Name is required",
+    "nameAlreadyExistsError": "Name already exists",
+    "currencyLabel": "Currency",
+    "currencyHint": "Enter currency",
+
+    "syncCompleted": "Sync completed.",
+    "syncFailed": "Sync failed: {error}",
+    "@syncFailed": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "syncUnavailable": "Sync unavailable",
+    "syncNow": "Sync now",
+    "lastSyncLabel": "Last sync: {time}",
+    "@lastSyncLabel": {
+        "placeholders": { "time": { "type": "String" } }
+    },
+    "queuedChanges": "Queued changes: {count}{breakdown}",
+    "@queuedChanges": {
+        "placeholders": {
+            "count": { "type": "int" },
+            "breakdown": { "type": "String" }
+        }
+    },
+    "lastDownloadLabel": "Last download: {counters}",
+    "@lastDownloadLabel": {
+        "placeholders": { "counters": { "type": "String" } }
+    },
+    "skippedRowsLabel": "Held for retry: {counters}",
+    "@skippedRowsLabel": {
+        "placeholders": { "counters": { "type": "String" } }
+    },
+    "syncNeedsAttentionDetail": "Sync needs attention:\\n{error}",
+    "@syncNeedsAttentionDetail": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "parkedEvictedWarning": "Warning: {count} parked op(s) evicted this session (cap reached).",
+    "@parkedEvictedWarning": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "syncingStatus": "Syncing…",
+    "syncErrorStatus": "Sync error",
+    "unknownError": "Unknown error.",
+    "syncedStatus": "Synced",
+    "syncedWithPending": "Synced • {count} change(s) queued",
+    "@syncedWithPending": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "syncNeedsAttention": "Sync needs attention",
+    "waitingToSync": "Waiting to sync • {count} change(s) queued",
+    "@waitingToSync": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "upToDateStatus": "Up to date",
+    "neverSynced": "Never"
 }

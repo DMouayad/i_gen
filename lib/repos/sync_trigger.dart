@@ -33,27 +33,37 @@ class SyncUiState {
   final Map<String, int> uploadedByTable;
   final Map<String, int> downloadedByTable;
 
+  /// Rows pulled but not merged (orphan children waiting on parents,
+  /// stale LWW losers) per table, from the last run. Visible instead of
+  /// `debugPrint`-only so silent starvation (e.g. prices never arriving)
+  /// is diagnosable from settings.
+  final Map<String, int> skippedByTable;
+
   const SyncUiState({
     this.status = SyncStatus.unknown,
     this.lastSyncAt,
     this.lastError,
     this.uploadedByTable = const {},
     this.downloadedByTable = const {},
+    this.skippedByTable = const {},
   });
 
   SyncUiState copyWith({
     SyncStatus? status,
     DateTime? lastSyncAt,
     String? lastError,
+    bool clearError = false,
     Map<String, int>? uploadedByTable,
     Map<String, int>? downloadedByTable,
+    Map<String, int>? skippedByTable,
   }) {
     return SyncUiState(
       status: status ?? this.status,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
-      lastError: lastError ?? this.lastError,
+      lastError: clearError ? null : (lastError ?? this.lastError),
       uploadedByTable: uploadedByTable ?? this.uploadedByTable,
       downloadedByTable: downloadedByTable ?? this.downloadedByTable,
+      skippedByTable: skippedByTable ?? this.skippedByTable,
     );
   }
 }
@@ -134,10 +144,15 @@ class SyncTrigger {
     state.value = state.value.copyWith(status: SyncStatus.syncing);
     try {
       await requested();
-      state.value = state.value.copyWith(
-        status: SyncStatus.synced,
-        lastSyncAt: DateTime.now(),
-      );
+      // The engine publishes the authoritative state via report() during the
+      // run; only mark synced here if it didn't (e.g. a non-engine trigger).
+      // Overwriting unconditionally would clobber a just-reported error.
+      if (state.value.status == SyncStatus.syncing) {
+        state.value = state.value.copyWith(
+          status: SyncStatus.synced,
+          lastSyncAt: DateTime.now(),
+        );
+      }
     } catch (e) {
       state.value = state.value.copyWith(
         status: SyncStatus.error,

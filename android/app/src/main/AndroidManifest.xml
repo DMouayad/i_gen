@@ -42,6 +42,8 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    <!-- Phase 11: staff new-order tray alerts (runtime-prompted on API 33+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Gal: For supporting API <= 29 :Gal-->
      <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
                  android:maxSdkVersion="29" />

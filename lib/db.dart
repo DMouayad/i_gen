@@ -107,6 +107,22 @@ class DbConstants {
     final suffix = rand.nextInt(1 << 32).toRadixString(36).padLeft(7, '0');
     return '$micros-$suffix';
   }
+
+  /// Deterministic idempotency key for catalog seed rows: every install
+  /// computes the same key for the same natural key, so a second device's
+  /// push upserts onto the first device's server row (same owner) instead
+  /// of creating a duplicate twin that later breaks pull merges
+  /// (UNIQUE(model) abort + orphan price skips).
+  static String seedOpId(String table, String naturalKey) =>
+      'seed-$table-$naturalKey';
+
+  /// True for best-effort catalog-seed ops (see [seedOpId]). Seed pushes are
+  /// convergence hints, not user data: when the server refuses them the
+  /// device heals via pull, so they must never park as errors.
+  /// Scoped to the product seed stream (the only seed writer today); the
+  /// full `seed-product-` prefix keeps random op ids from ever matching.
+  static bool isSeedOpId(String table, String opId) =>
+      table == tableProduct && opId.startsWith('seed-$tableProduct-');
 }
 
 class DbProvider {

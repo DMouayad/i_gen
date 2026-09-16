@@ -11,15 +11,18 @@ Widget trinaDropDownRenderer(
   dynamic Function(dynamic)? handleSelected,
   void Function(dynamic newValue) onChanged,
 ) {
-  final textStyle = TextStyle(
-    fontSize: 18,
+  final textStyle = context.textTheme.bodyLarge!.copyWith(
     fontWeight: FontWeight.w600,
-    color: Colors.black,
   );
   String? value = cell.value;
   Color indicatorColor = context.colorScheme.secondary;
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
+    padding: const EdgeInsets.symmetric(horizontal: AppGaps.sm),
+    decoration: BoxDecoration(
+      color: context.colorScheme.surface,
+      border: Border.all(color: context.colorScheme.outlineVariant),
+      borderRadius: BorderRadius.circular(AppRadii.control),
+    ),
     child: StatefulBuilder(
       builder: (context, mSetState) {
         return DropdownButtonHideUnderline(

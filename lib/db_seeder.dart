@@ -32,12 +32,19 @@ class DbSeeder {
           DbConstants.columnUpdatedAt: now,
           DbConstants.columnIsDeleted: 0,
         });
+        // Deterministic key per model: a second device pushing the same
+        // bundled catalog upserts onto the same server rows (same owner)
+        // instead of creating duplicate twins that break pull merges.
         await SyncMetadata.recordMutation(
           txn,
           ref: MutationRef(
             table: DbConstants.tableProduct,
             rowId: product.$1,
             op: DbConstants.opInsert,
+          ),
+          opIdOverride: DbConstants.seedOpId(
+            DbConstants.tableProduct,
+            product.$2,
           ),
         );
       }

@@ -43,27 +43,34 @@ class PreventPop extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.dialog),
+        ),
         icon: Icon(
           Icons.warning_amber_rounded,
           color: context.colorScheme.error,
           size: 48,
         ),
-        title: const Text('Discard Changes?'),
+        title: Text(context.l10n.discardChangesTitle),
         content: Text(
-          'You have unsaved changes. Are you sure you want to discard them?',
+          context.l10n.discardChangesMessage,
           style: context.textTheme.bodyLarge,
         ),
         actions: [
           OutlinedButton(
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+            ),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep Editing'),
+            child: Text(context.l10n.keepEditing),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: context.colorScheme.error,
+              minimumSize: const Size(64, 48),
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Discard'),
+            child: Text(context.l10n.discardButton),
           ),
         ],
       ),

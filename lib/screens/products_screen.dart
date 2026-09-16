@@ -20,13 +20,23 @@ class ProductsScreen2 extends StatefulWidget {
 class _ProductsScreen2State extends State<ProductsScreen2> {
   final storedProducts = GetIt.I.get<ProductsController>().products;
   late TrinaGridStateManager stateManager;
-  late final List<TrinaRow> rows;
+  late List<TrinaRow> rows;
+
+  /// Bumped on manual refresh to remount the grid with fresh rows.
+  int _gridTick = 0;
 
   final ValueNotifier<String?> validationErrorNotifier = ValueNotifier(null);
 
   bool _disposed = false;
 
-  final textStyle = TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
+  TextStyle _cellTextStyle(BuildContext context) =>
+      context.textTheme.bodyLarge!.copyWith(
+        fontWeight: FontWeight.bold,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  TextStyle _columnTextStyle(BuildContext context) =>
+      _cellTextStyle(context).copyWith(color: context.colorScheme.primary);
   @override
   void dispose() {
     _disposed = true;
@@ -41,10 +51,10 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
   /// Builds the grid columns for the given mode. Called on every build so a
   /// role change (sign in/out) immediately flips edit affordances without
   /// touching the rows.
-  List<TrinaColumn> _buildColumns(bool readOnly) {
+  List<TrinaColumn> _buildColumns(BuildContext context, bool readOnly) {
     return [
       TrinaColumn(
-        title: 'ID',
+        title: context.l10n.productIdColumn,
         field: 'id',
         type: TrinaColumnType.text(),
         validator: (value, validationContext) {
@@ -52,7 +62,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
             if (row.cells['id']!.value == value &&
                 row.cells['status']!.value == 'saved') {
               validationContext.row.cells['status']!.value = 'error';
-              return 'A Product with model $value already exists';
+              return context.l10n.productAlreadyExists('$value');
             }
           }
           validationContext.row.cells['status']!.value = 'edited';
@@ -66,11 +76,14 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
           margin: EdgeInsets.all(.1),
           alignment: Alignment.center,
           color: switch (rendererContext.row.cells['status']!.value) {
-            'edited' => Colors.amber[100]!,
+            'edited' => context.colorScheme.tertiaryContainer,
             'error' => context.colorScheme.errorContainer,
             _ => null,
           },
-          child: Text(rendererContext.cell.value, style: textStyle),
+          child: Text(
+            rendererContext.cell.value,
+            style: _cellTextStyle(context),
+          ),
         ),
         width: 50,
         cellPadding: EdgeInsets.zero,
@@ -80,11 +93,11 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
         textAlign: TrinaColumnTextAlign.center,
       ),
       TrinaColumn(
-        title: 'Name',
+        title: context.l10n.productNameColumn,
         field: 'name',
         type: TrinaColumnType.text(),
         renderer: (rendererContext) =>
-            Text(rendererContext.cell.value, style: textStyle),
+            Text(rendererContext.cell.value, style: _cellTextStyle(context)),
         minWidth: 300,
         enableColumnDrag: false,
         enableContextMenu: false,
@@ -92,7 +105,7 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
         enableTitleChecked: false,
       ),
       TrinaColumn(
-        title: 'Actions',
+        title: context.l10n.productActionsColumn,
         field: 'status',
         width: 70,
         type: TrinaColumnType.select(<String>[
@@ -167,10 +180,8 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
     ];
   }
 
-  @override
-  void initState() {
-    super.initState();
-    rows = GetIt.I
+  List<TrinaRow> _buildRows() {
+    return GetIt.I
         .get<ProductsController>()
         .products
         .values
@@ -184,6 +195,26 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
           ),
         )
         .toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    rows = _buildRows();
+  }
+
+  /// Manual refresh (invoked after the header runs a sync): reload the
+  /// controller, then remount the grid — but never drop unsaved edits, so a
+  /// dirty grid keeps its rows (fresh data appears on next rebuild).
+  Future<void> _refresh() async {
+    await GetIt.I.get<ProductsController>().reload();
+    if (_disposed || !mounted) return;
+    if (widget.unsavedProductCountNotifier.value == 0) {
+      setState(() {
+        rows = _buildRows();
+        _gridTick++;
+      });
+    }
   }
 
   void updateDirtyCount() {
@@ -224,7 +255,8 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
               width: 1024,
               height: context.height,
               child: TrinaGrid(
-                columns: _buildColumns(readOnly),
+                key: ValueKey(_gridTick),
+                columns: _buildColumns(context, readOnly),
                 rows: rows,
                 onChanged: (TrinaGridOnChangedEvent event) {
                   if (_readOnly) return;
@@ -243,9 +275,9 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                     SnackBar(
                       content: Text(
                         event.errorMessage,
-                        style: textStyle.copyWith(
-                          color: context.colorScheme.onErrorContainer,
-                        ),
+                        style: _cellTextStyle(
+                          context,
+                        ).copyWith(color: context.colorScheme.onErrorContainer),
                       ),
 
                       behavior: SnackBarBehavior.floating,
@@ -258,10 +290,11 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                   stateManager.setEditing(false);
                 },
                 createHeader: (stateManager) => TrinaTableHeader(
-                  addNewText: 'Add Product',
+                  addNewText: context.l10n.addProduct,
                   showAdd: !readOnly,
+                  onRefresh: _refresh,
                   unSavedCountText: (count) =>
-                      'You have $count un saved products',
+                      context.l10n.unsavedProductsCount(count),
                   unSavedCountNotifier: widget.unsavedProductCountNotifier,
                   stateManager: stateManager,
                   newRow: () => TrinaRow(
@@ -276,15 +309,13 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
                 configuration: TrinaGridConfiguration(
                   enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
                   style: TrinaGridStyleConfig(
-                    cellDirtyColor: Colors.amber[100]!,
+                    cellDirtyColor: context.colorScheme.tertiaryContainer,
                     borderColor: context.colorScheme.surfaceDim,
                     gridBorderColor: context.colorScheme.surfaceDim,
-                    gridBorderRadius: BorderRadius.circular(6),
-                    cellTextStyle: textStyle,
-                    columnTextStyle: textStyle.copyWith(
-                      color: context.colorScheme.primary,
-                    ),
-                    evenRowColor: Colors.white,
+                    gridBorderRadius: BorderRadius.circular(AppRadii.card),
+                    cellTextStyle: _cellTextStyle(context),
+                    columnTextStyle: _columnTextStyle(context),
+                    evenRowColor: context.colorScheme.surfaceContainerLowest,
                     oddRowColor: context.colorScheme.surface,
                   ),
                   scrollbar: TrinaGridScrollbarConfig(
@@ -307,14 +338,11 @@ class _ProductsScreen2State extends State<ProductsScreen2> {
               ),
             ),
             if (readOnly)
-              const Positioned(
+              Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
-                child: ReadOnlyBanner(
-                  text:
-                      'Catalog is read-only for your role — ask an admin for changes.',
-                ),
+                child: ReadOnlyBanner(text: context.l10n.catalogReadOnly),
               ),
           ],
         );

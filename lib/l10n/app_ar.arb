@@ -1,0 +1,325 @@
+{
+    "@@locale": "ar",
+    "productModel": "الموديل",
+    "@productModel": { "description": "Product model name column header" },
+    "productDescription": "الوصف",
+    "@productDescription": { "description": "Product description column header" },
+    "quantity": "الكمية",
+    "@quantity": { "description": "Quantity column header" },
+    "price": "السعر",
+    "@price": { "description": "Unit price column header" },
+    "lineTotal": "إجمالي السطر",
+    "@lineTotal": { "description": "Line total column header" },
+    "total": "الإجمالي",
+    "@total": { "description": "Invoice total label" },
+    "addItem": "إضافة صنف",
+    "@addItem": { "description": "Button to add an invoice line item" },
+
+    "sortLabel": "فرز",
+    "sortAz": "من أ إلى ي",
+    "sortZa": "من ي إلى أ",
+    "sortNewest": "من الأحدث",
+    "sortOldest": "من الأقدم",
+    "sortNone": "بدون",
+    "noInvoicesFound": "لم يتم العثور على فواتير",
+    "archiveEmptyHint": "ستظهر الفواتير المحفوظة هنا.",
+    "delete": "حذف",
+    "deleteConfirmTitle": "حذف؟",
+    "deleteConfirmMessage": "لا يمكن التراجع عن هذا الإجراء.",
+
+    "invoiceUnsavedTitle": "لم يتم حفظ الفاتورة",
+    "invoiceUnsavedMessage": "تحتوي الفاتورة على تغييرات غير محفوظة، هل تريد المتابعة؟",
+    "unsavedProductsTitle": "منتجات غير محفوظة",
+    "unsavedProductsMessage": "لديك منتجات غير محفوظة، هل تريد المتابعة؟",
+    "unsavedPricingCategoryTitle": "فئة تسعير غير محفوظة",
+    "unsavedPricingCategoryMessage": "لديك فئة تسعير غير محفوظة، هل تريد المتابعة؟",
+    "unsavedProductPricingTitle": "تسعير منتج غير محفوظ",
+    "unsavedProductPricingMessage": "لديك تسعير منتج غير محفوظ، هل تريد المتابعة؟",
+    "navInvoices": "الفواتير",
+    "navProducts": "المنتجات",
+    "navPricing": "الأسعار",
+    "navOrders": "الطلبات",
+    "navSettings": "الإعدادات",
+    "notFoundLabel": "404",
+    "dialogYes": "نعم",
+    "dialogNo": "لا",
+
+    "inviteLinkAcceptedChoosePassword": "تم قبول الرابط — اختر كلمة مرور للمتابعة.",
+    "inviteLinkAcceptedSignIn": "تم قبول الرابط — سجّل الدخول بكلمة المرور الجديدة.",
+    "inviteLinkAcceptFailed": "تعذّر قبول الرابط — حاول مرة أخرى.",
+    "invitePasswordSetDone": "تم تعيين كلمة المرور — سجّل الدخول بريدك الإلكتروني وكلمة المرور.",
+    "acceptInvitationTitle": "قبول الدعوة",
+    "choosePasswordLabel": "اختر كلمة المرور",
+    "setPasswordButton": "تعيين كلمة المرور",
+    "done": "تم",
+
+    "save": "حفظ",
+    "edit": "تعديل",
+    "exportImage": "تصدير كصورة",
+    "exportPdf": "تصدير كـ PDF",
+    "invoiceTitle": "فاتورة",
+
+    "ordersNeedSyncConfig": "الطلبات بحاجة لإعداد المزامنة — يعمل التطبيق دون اتصال.",
+    "ordersSignInPrompt": "سجّل الدخول من الإعدادات لعرض الطلبات.",
+    "ordersDistributorGuidance": "يقوم الموزّعون بتقديم ومتابعة الطلبات في تطبيق الويب — افتح رابط الترحيب للمتابعة هناك.",
+    "distributors": "الموزّعون",
+    "noConnectionOrders": "لا يوجد اتصال — اتصل لعرض الطلبات الحية.",
+    "couldNotLoadOrders": "تعذّر تحميل الطلبات: {error}",
+    "@couldNotLoadOrders": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "retry": "إعادة المحاولة",
+    "refresh": "تحديث",
+    "noOrdersYet": "لا توجد طلبات بعد.",
+    "orderAmountTitle": "{total} {currency}",
+    "@orderAmountTitle": {
+        "placeholders": {
+            "total": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "newOrderChannelName": "طلبات جديدة",
+    "newOrderChannelDescription": "تنبيهات عند تقديم موزع لطلب.",
+    "newOrderTitle": "طلب جديد",
+    "newOrderBody": "{total} {currency}",
+    "@newOrderBody": {
+        "placeholders": {
+            "total": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "orderSubtitle": "{status} · {date}",
+    "@orderSubtitle": {
+        "placeholders": {
+            "status": { "type": "String" },
+            "date": { "type": "String" }
+        }
+    },
+    "filterAll": "الكل",
+    "orderStatusPending": "قيد الانتظار",
+    "orderStatusConfirmed": "مؤكد",
+    "orderStatusDelivered": "تم التسليم",
+    "orderStatusCancelled": "ملغي",
+    "noConnectionShort": "لا يوجد اتصال.",
+    "unexpectedError": "{error}",
+    "@unexpectedError": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "orderDetailTitle": "طلب · {status}",
+    "@orderDetailTitle": {
+        "placeholders": { "status": { "type": "String" } }
+    },
+    "orderNoLines": "لا توجد أصناف في هذا الطلب.",
+    "orderItemAmount": "×{amount}",
+    "@orderItemAmount": {
+        "placeholders": { "amount": { "type": "String" } }
+    },
+    "close": "إغلاق",
+    "noConnectionDistributors": "لا يوجد اتصال — اتصل لعرض الموزّعين.",
+    "couldNotLoadDistributors": "تعذّر تحميل الموزّعين: {error}",
+    "@couldNotLoadDistributors": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "noDistributorsYet": "لا يوجد موزّعون بعد — ادعُ أحدهم من الإعدادات.",
+
+    "productIdColumn": "المعرّف",
+    "productAlreadyExists": "يوجد منتج بالنموذج {model} مسبقًا",
+    "@productAlreadyExists": {
+        "placeholders": { "model": { "type": "String" } }
+    },
+    "productNameColumn": "الاسم",
+    "productActionsColumn": "الإجراءات",
+    "addProduct": "إضافة منتج",
+    "unsavedProductsCount": "لديك {count} من المنتجات غير المحفوظة",
+    "@unsavedProductsCount": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "catalogReadOnly": "الكتالوج للقراءة فقط لدورك — اطلب التعديلات من المسؤول.",
+    "newProduct": "منتج جديد",
+    "editProduct": "تعديل المنتج",
+    "searchLabel": "بحث",
+    "productModelRequired": "يرجى إدخال النموذج",
+    "productNameRequired": "يرجى إدخال الاسم",
+    "cancelButton": "إلغاء",
+
+    "settingsOfflineFirstNote": "تُحفظ تعديلاتك على هذا الجهاز أولًا وتُزامَن عندما تكون متصلًا ومسجّلًا الدخول.",
+    "settingsStagingNote": "تُحفظ تعديلاتك على هذا الجهاز. تُفعَّل المزامنة بعد اجتياز قائمة التحقق التجريبية.",
+    "syncNotConfigured": "المزامنة غير مُعدّة",
+    "syncNotConfiguredHint": "عمل التطبيق دون اتصال بالكامل. أضف بيانات Supabase لتفعيل تسجيل الدخول.",
+    "signedInFallback": "مسجّل الدخول",
+    "syncAccountNote": "تُزامَن تعديلاتك مع هذا الحساب.",
+    "syncAccountRoleNote": "تُزامَن تعديلاتك مع هذا الحساب. الدور: {role}.",
+    "@syncAccountRoleNote": {
+        "placeholders": { "role": { "type": "String" } }
+    },
+    "signOut": "تسجيل الخروج",
+    "signInToSync": "سجّل الدخول للمزامنة",
+    "signInInviteHint": "تُنشأ الحسابات بواسطة المسؤول — اطلب رابط دعوة عبر واتساب.",
+    "emailLabel": "البريد الإلكتروني",
+    "passwordLabel": "كلمة المرور",
+    "signInAction": "تسجيل الدخول",
+    "haveInviteLinkTitle": "هل لديك رابط دعوة؟ الصقه لتعيين كلمة المرور.",
+    "inviteLinkFieldLabel": "رابط دعوة واتساب",
+    "inviteLinkFieldHint": "الصق الرابط الكامل هنا",
+    "acceptInviteLink": "قبول رابط الدعوة",
+    "loginPreview": "معاينة الدخول: {slug}@",
+    "@loginPreview": {
+        "placeholders": { "slug": { "type": "String" } }
+    },
+    "inviteUsersTitle": "دعوة المستخدمين",
+    "inviteUsersHint": "أرسل الرابط المُنشأ عبر واتساب. يحدّد المستخدم كلمة المرور بنفسه — لا يبقى أي سرّ في المحادثة.",
+    "nameArabicLabel": "الاسم (بالعربية)",
+    "nameEnglishLabel": "الاسم (بالإنجليزية)",
+    "phoneWhatsappLabel": "الهاتف (واتساب)",
+    "roleFieldLabel": "الدور",
+    "roleEmployee": "موظف",
+    "roleDistributor": "موزّع",
+    "inviteActionLabel": "الإجراء",
+    "inviteModeNew": "دعوة جديدة",
+    "inviteModeResend": "إعادة إرسال الرابط",
+    "inviteModeRecovery": "إعادة تعيين كلمة المرور",
+    "loginEmailLabel": "الدخول: {email}",
+    "@loginEmailLabel": {
+        "placeholders": { "email": { "type": "String" } }
+    },
+    "inviteShareText": "حسابك: {email}\\nافتح هذا الرابط لتعيين كلمة المرور:\\n{link}",
+    "@inviteShareText": {
+        "placeholders": {
+            "email": { "type": "String" },
+            "link": { "type": "String" }
+        }
+    },
+    "inviteCopiedHint": "تم النسخ — أرسله عبر واتساب.",
+    "copyForWhatsapp": "نسخ لواتساب",
+    "createInviteLink": "إنشاء رابط دعوة",
+    "resendInviteLink": "إعادة إرسال رابط الدعوة",
+    "sendPasswordResetLink": "إرسال رابط إعادة تعيين كلمة المرور",
+
+    "newInvoice": "فاتورة جديدة",
+    "saveButton": "حفظ",
+    "previewButton": "معاينة",
+    "grandTotal": "الإجمالي الكلي: {value}",
+    "@grandTotal": {
+        "placeholders": { "value": { "type": "num" } }
+    },
+    "invoiceSaved": "تم حفظ الفاتورة · {value}",
+    "@invoiceSaved": {
+        "placeholders": { "value": { "type": "num" } }
+    },
+    "customerNameHint": "اسم العميل",
+
+    "discount": "الخصم",
+    "itemsCount": "الأصناف ({count})",
+    "@itemsCount": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "customPriceList": "مخصص ({currency})",
+    "@customPriceList": {
+        "placeholders": { "currency": { "type": "String" } }
+    },
+    "priceCategoryOption": "{name} ({currency})",
+    "@priceCategoryOption": {
+        "placeholders": {
+            "name": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "removeButton": "إزالة",
+    "searchProductHint": "ابحث عن منتج...",
+    "productSuggestion": "{model}: {name}",
+    "@productSuggestion": {
+        "placeholders": {
+            "model": { "type": "String" },
+            "name": { "type": "String" }
+        }
+    },
+    "noProductsFound": "لا توجد منتجات مطابقة",
+
+    "goBack": "رجوع",
+    "textSizeLabel": "حجم النص {size}",
+    "@textSizeLabel": {
+        "placeholders": { "size": { "type": "int" } }
+    },
+    "editButton": "تعديل",
+    "exportAsImage": "تصدير كصورة",
+    "exportAsPdf": "تصدير كـ PDF",
+    "billTo": "فاتورة إلى",
+    "thankYouNote": "شكراً لتعاملكم معنا",
+    "unitPrice": "سعر الوحدة",
+    "subtotal": "المجموع الفرعي",
+    "selectPriceList": "اختر قائمة الأسعار",
+
+    "discardChangesTitle": "تجاهل التغييرات؟",
+    "discardChangesMessage": "لديك تغييرات غير محفوظة. هل أنت متأكد من تجاهلها؟",
+    "keepEditing": "متابعة التحرير",
+    "discardButton": "تجاهل",
+
+    "priceCategoryColumnTitle": "{title} ({currency})",
+    "@priceCategoryColumnTitle": {
+        "placeholders": {
+            "title": { "type": "String" },
+            "currency": { "type": "String" }
+        }
+    },
+    "saveAllButton": "حفظ الكل",
+    "newPriceList": "قائمة جديدة",
+    "pricingReadOnlyMessage": "الأسعار للعرض فقط حسب دورك — اطلب من مدير إجراء التعديلات.",
+    "editOrDeleteList": "تعديل هذه القائمة أو حذفها",
+    "deleteButton": "حذف",
+    "priceCategoryNameLabel": "الاسم",
+    "priceCategoryNameHint": "أدخل الاسم",
+    "nameRequiredError": "الاسم مطلوب",
+    "nameAlreadyExistsError": "الاسم موجود مسبقاً",
+    "currencyLabel": "العملة",
+    "currencyHint": "أدخل العملة",
+
+    "syncCompleted": "تمت المزامنة.",
+    "syncFailed": "فشلت المزامنة: {error}",
+    "@syncFailed": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "syncUnavailable": "المزامنة غير متاحة",
+    "syncNow": "مزامنة الآن",
+    "lastSyncLabel": "آخر مزامنة: {time}",
+    "@lastSyncLabel": {
+        "placeholders": { "time": { "type": "String" } }
+    },
+    "queuedChanges": "تغييرات معلقة: {count}{breakdown}",
+    "@queuedChanges": {
+        "placeholders": {
+            "count": { "type": "int" },
+            "breakdown": { "type": "String" }
+        }
+    },
+    "lastDownloadLabel": "آخر تنزيل: {counters}",
+    "@lastDownloadLabel": {
+        "placeholders": { "counters": { "type": "String" } }
+    },
+    "skippedRowsLabel": "مؤجل للمحاولة: {counters}",
+    "@skippedRowsLabel": {
+        "placeholders": { "counters": { "type": "String" } }
+    },
+    "syncNeedsAttentionDetail": "المزامنة تحتاج انتباه:\\n{error}",
+    "@syncNeedsAttentionDetail": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "parkedEvictedWarning": "تحذير: تم إسقاط {count} عملية متوقفة هذه الجلسة (تم بلوغ الحد).",
+    "@parkedEvictedWarning": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "syncingStatus": "جارٍ المزامنة…",
+    "syncErrorStatus": "خطأ في المزامنة",
+    "unknownError": "خطأ غير معروف.",
+    "syncedStatus": "تمت المزامنة",
+    "syncedWithPending": "تمت المزامنة • {count} تغيير معلق",
+    "@syncedWithPending": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "syncNeedsAttention": "المزامنة تحتاج انتباه",
+    "waitingToSync": "بانتظار المزامنة • {count} تغيير معلق",
+    "@waitingToSync": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "upToDateStatus": "محدّث",
+    "neverSynced": "أبداً"
+}

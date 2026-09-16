@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
@@ -43,8 +41,13 @@ class InvoiceLineData {
 }
 
 class InvoiceLineInputMobile extends StatefulWidget {
-  const InvoiceLineInputMobile({super.key, required this.controller});
+  const InvoiceLineInputMobile({
+    super.key,
+    required this.controller,
+    this.onAddLineChanged,
+  });
   final InvoiceDetailsController controller;
+  final ValueChanged<VoidCallback?>? onAddLineChanged;
 
   @override
   State<InvoiceLineInputMobile> createState() => _InvoiceLineInputMobileState();
@@ -61,12 +64,12 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
 
   Map<String, Product> get _products =>
       GetIt.I.get<ProductsController>().products;
-  Timer? _debounce;
   @override
   void initState() {
     super.initState();
+    final discount = widget.controller.discount;
     discountController = TextEditingController(
-      text: widget.controller.discount.toString(),
+      text: discount == 0 ? '' : discount.toString(),
     );
     _initializeLines();
     _fetchPricingData();
@@ -74,6 +77,7 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
 
   @override
   void dispose() {
+    widget.onAddLineChanged?.call(null);
     for (final line in _lines) {
       line.dispose();
     }
@@ -123,6 +127,7 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
       if (_lines.isEmpty) _addLine();
       _markUnsaved();
     });
+    _saveLines();
   }
 
   void _updateProduct(int index, String productName) {
@@ -133,63 +138,116 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
     if (product.model.isEmpty) return;
 
     setState(() {
-      final newPrice = _getProductPrice(product.model) ?? 0;
+      // Named price list: adopt the listed price. Custom (name == null):
+      // keep whatever the user already typed instead of resetting to 0.
+      final newPrice = _getProductPrice(product.model);
       _lines[index].row = _lines[index].row.copyWith(
         product: product,
-        unitPrice: newPrice,
+        unitPrice: newPrice ?? _lines[index].row.unitPrice,
       );
-      _lines[index].updatePrice(newPrice, _formatNumber);
+      if (newPrice != null) {
+        _lines[index].updatePrice(newPrice, _formatNumber);
+      }
       _markUnsaved();
     });
     _saveLines();
   }
 
   void _updateAmount(int index, String value) {
-    final amount = int.tryParse(value) ?? 0;
-    if (amount >= 0) {
-      _lines[index].row = _lines[index].row.copyWith(amount: amount);
-      _markUnsaved();
-      setState(() {});
-      _saveLines();
-    }
+    final amount = _parseInt(value);
+    if (amount == null || amount < 0) return; // invalid keystroke: keep last.
+    _lines[index].row = _lines[index].row.copyWith(amount: amount);
+    _markUnsaved();
+    setState(() {});
+    _saveLines();
   }
 
   void _updatePrice(int index, String value) {
-    final price = num.tryParse(value.replaceAll(',', '')) ?? 0;
-    if (price >= 0) {
-      _lines[index].row = _lines[index].row.copyWith(unitPrice: price);
-      _markUnsaved();
-      setState(() {});
-      _saveLines();
-    }
+    final price = _parseDecimal(value);
+    if (price == null || price < 0) return; // invalid keystroke: keep last.
+    _lines[index].row = _lines[index].row.copyWith(unitPrice: price);
+    _markUnsaved();
+    setState(() {});
+    _saveLines();
   }
 
   void _updateDiscount(String discount) {
-    widget.controller.discount = num.tryParse(discount)?.toDouble() ?? 0;
+    final parsed = _parseDecimal(discount);
+    if (parsed == null) return; // invalid keystroke: keep last.
+    widget.controller.discount = parsed.toDouble();
+    _markUnsaved();
   }
 
+  /// Syncs line edits into the shared controller immediately, so Save and
+  /// Preview (which read the controller synchronously) never miss the
+  /// latest keystrokes behind a debounce timer.
   void _saveLines() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      // Sync controller values
-      for (final line in _lines) {
-        final amount = int.tryParse(line.amountController.text) ?? 0;
-        final price =
-            num.tryParse(line.priceController.text.replaceAll(',', '')) ?? 0;
-        line.row = line.row.copyWith(amount: amount, unitPrice: price);
-      }
+    // Re-read from the text controllers: the source of truth for what the
+    // user actually typed (row copies can lag behind IME composition).
+    // Unparseable intermediate states keep the last good value.
+    for (final line in _lines) {
+      final amount = _parseInt(line.amountController.text);
+      final price = _parseDecimal(line.priceController.text);
+      line.row = line.row.copyWith(
+        amount: amount ?? line.row.amount,
+        unitPrice: price ?? line.row.unitPrice,
+      );
+    }
 
-      widget.controller.invoiceLines = _lines
-          .where((l) => l.row.product.model.isNotEmpty && l.row.amount > 0)
-          .map((l) => l.row)
-          .toList();
-      widget.controller.reCalculateTotal();
-    });
+    widget.controller.invoiceLines = _lines
+        .where((l) => l.row.product.model.isNotEmpty && l.row.amount > 0)
+        .map((l) => l.row)
+        .toList();
+    widget.controller.reCalculateTotal();
   }
 
   void _markUnsaved() => widget.controller.hasUnsavedChanges = true;
 
   // ===== Helpers =====
+
+  /// Parses user-typed integers across locales/keyboards. Empty clears to 0;
+  /// anything unparseable returns null (caller keeps the last good value
+  /// instead of zeroing the line on an intermediate keystroke like '.').
+  int? _parseInt(String raw) {
+    final canonical = _canonicalNumber(raw);
+    if (canonical.isEmpty) return 0;
+    return int.tryParse(canonical);
+  }
+
+  /// Same contract as [_parseInt] for decimal price/discount fields.
+  num? _parseDecimal(String raw) {
+    final canonical = _canonicalNumber(raw);
+    if (canonical.isEmpty) return 0;
+    if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(canonical)) return null;
+    return num.tryParse(canonical);
+  }
+
+  /// Canonicalizes typed numbers: Arabic-Indic digits (٠-٩, ۰-۹) become
+  /// ASCII, thousands separators (`,`, `٬`, spaces) are dropped, and the
+  /// Arabic decimal separator (`٫`) becomes `.`. Needed because formatted
+  /// values round-trip through these controllers and `num.tryParse` is
+  /// ASCII-only — without this an AR-locale price re-parses to 0.
+  String _canonicalNumber(String raw) {
+    final trimmed = raw.trim();
+    final isNegative = trimmed.startsWith('-');
+    final sb = StringBuffer();
+    for (final rune in raw.runes) {
+      if (rune >= 0x30 && rune <= 0x39) {
+        sb.writeCharCode(rune);
+      } else if (rune >= 0x660 && rune <= 0x669) {
+        sb.writeCharCode(rune - 0x660 + 0x30);
+      } else if (rune >= 0x6F0 && rune <= 0x6F9) {
+        sb.writeCharCode(rune - 0x6F0 + 0x30);
+      } else if (rune == 0x66B) {
+        sb.write('.'); // Arabic decimal separator.
+      } else if (rune == 0x2E) {
+        sb.write('.');
+      }
+      // Everything else (thousands separators, spaces, signs) is dropped.
+    }
+    final canonical = sb.toString();
+    return isNegative && canonical.isNotEmpty ? '-$canonical' : canonical;
+  }
 
   double? _getProductPrice(String model) {
     if (_priceCategory.name == null || _productsPricing == null) return null;
@@ -220,6 +278,12 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
   // ===== UI =====
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    widget.onAddLineChanged?.call(_addLine);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -230,32 +294,35 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
         ),
         _buildDiscount(),
         _buildLinesList(),
-        _buildAddButton(),
       ],
     );
   }
 
   Widget _buildDiscount() {
     return Container(
-      margin: const EdgeInsets.all(8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.all(AppGaps.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppGaps.md,
+        vertical: AppGaps.md,
+      ),
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.4,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Row(
-        spacing: 4,
+        spacing: AppGaps.sm,
         children: [
-          Icon(Icons.discount_outlined, color: Colors.redAccent),
-          Text('Discount: '),
+          Icon(Icons.discount_outlined, color: context.colorScheme.primary),
+          Text(context.l10n.discount),
 
           Flexible(
             child: _CustomTextField(
-              label: 'Discount',
+              label: context.l10n.discount,
               controller: discountController,
               onChanged: _updateDiscount,
+              allowDecimal: true,
             ),
           ),
         ],
@@ -267,10 +334,10 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppGaps.sm),
       itemCount: _lines.length,
       itemBuilder: (context, index) => _InvoiceLineCard(
-        key: ValueKey(_lines[index].hashCode),
+        key: ObjectKey(_lines[index]),
         index: index,
         lineData: _lines[index],
         products: _products,
@@ -280,23 +347,6 @@ class _InvoiceLineInputMobileState extends State<InvoiceLineInputMobile> {
         onProductSelected: (name) => _updateProduct(index, name),
         onAmountChanged: (value) => _updateAmount(index, value),
         onPriceChanged: (value) => _updatePrice(index, value),
-      ),
-    );
-  }
-
-  Widget _buildAddButton() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: TextButton.icon(
-        onPressed: _addLine,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Add Line',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(double.infinity, 48),
-        ),
       ),
     );
   }
@@ -320,18 +370,21 @@ class _Header extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Container(
-      margin: const EdgeInsets.all(8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.all(AppGaps.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppGaps.md,
+        vertical: AppGaps.md,
+      ),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Row(
         children: [
-          Icon(Icons.receipt_long, color: colors.primary),
-          const SizedBox(width: 8),
+          Icon(Icons.receipt_long_outlined, color: colors.primary),
+          const SizedBox(width: AppGaps.sm),
           Text(
-            'Items ($lineCount)',
+            context.l10n.itemsCount(lineCount),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -348,16 +401,20 @@ class _Header extends StatelessWidget {
       autoStart: true,
       futureBuilder: () => GetIt.I.get<PricingCategoryRepo>().getAll(),
       busyBuilder: (_) => const SizedBox(
-        width: 20,
-        height: 20,
+        width: 24,
+        height: 24,
         child: CircularProgressIndicator(strokeWidth: 2),
       ),
       dataBuilder: (_, categories) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppGaps.md,
+            vertical: AppGaps.sm,
+          ),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
+            color: context.colorScheme.surface,
+            border: Border.all(color: context.colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<(String, String?)>(
@@ -367,18 +424,20 @@ class _Header extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
               items: [
-                const DropdownMenuItem(
+                DropdownMenuItem(
                   value: ('SP', null),
-                  child: Text('Custom (ل.س)'),
+                  child: Text(context.l10n.customPriceList('ل.س')),
                 ),
-                const DropdownMenuItem(
+                DropdownMenuItem(
                   value: ('USD', null),
-                  child: Text('Custom (\$)'),
+                  child: Text(context.l10n.customPriceList('\$')),
                 ),
                 ...categories.map(
                   (e) => DropdownMenuItem(
                     value: (e.currency, e.name),
-                    child: Text('${e.name} (${e.currency})'),
+                    child: Text(
+                      context.l10n.priceCategoryOption(e.name, e.currency),
+                    ),
                   ),
                 ),
               ],
@@ -421,56 +480,102 @@ class _InvoiceLineCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final total = lineData.row.lineTotal;
+    // A line with a chosen product reads as "real"; the empty draft stays
+    // quiet. Stateless distinction only — no focus tracking involved.
+    final filled = lineData.row.product.model.isNotEmpty;
+
+    void stepQty(int delta) {
+      final current = int.tryParse(lineData.amountController.text) ?? 0;
+      final next = (current + delta).clamp(0, 999999);
+      lineData.amountController.text = next == 0 ? '' : '$next';
+      onAmountChanged(lineData.amountController.text);
+    }
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: AppGaps.sm),
       elevation: 0,
+      color: filled ? colors.primary.withValues(alpha: 0.05) : null,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: BorderSide(
+          color: filled
+              ? colors.primary.withValues(alpha: 0.5)
+              : colors.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppGaps.md),
         child: Column(
           children: [
             // Row 1: Line number + Product + Delete
             Row(
               children: [
                 _LineNumber(index: index + 1),
-                const SizedBox(width: 12),
-                Expanded(child: _buildProductField()),
+                const SizedBox(width: AppGaps.md),
+                Expanded(child: _buildProductField(context)),
                 IconButton(
                   icon: Icon(Icons.delete_outline, color: colors.error),
                   onPressed: onRemove,
-                  tooltip: 'Remove',
+                  tooltip: context.l10n.removeButton,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Row 2: Qty + Price + Total
+            const SizedBox(height: AppGaps.md),
+            // Row 2: Qty stepper (full width — thumbs need room)
             Row(
               children: [
+                Tooltip(
+                  message: context.l10n.quantity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => stepQty(-1),
+                    icon: const Icon(Icons.remove),
+                    label: const SizedBox.shrink(),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppGaps.sm),
                 Expanded(
-                  flex: 2,
                   child: _CustomTextField(
-                    label: 'Qty',
+                    label: context.l10n.quantity,
                     controller: lineData.amountController,
                     onChanged: onAmountChanged,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppGaps.sm),
+                Tooltip(
+                  message: context.l10n.quantity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => stepQty(1),
+                    icon: const Icon(Icons.add),
+                    label: const SizedBox.shrink(),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppGaps.md),
+            // Row 3: Price + Total
+            Row(
+              children: [
                 Expanded(
-                  flex: 3,
                   child: _CustomTextField(
-                    label: 'Price',
+                    label: context.l10n.price,
                     controller: lineData.priceController,
                     onChanged: onPriceChanged,
                     suffix: currency,
+                    allowDecimal: true,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppGaps.sm),
                 Expanded(
-                  flex: 3,
                   child: _TotalBadge(
                     total: total,
                     currency: currency,
@@ -485,21 +590,22 @@ class _InvoiceLineCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProductField() {
+  Widget _buildProductField(BuildContext context) {
     return TypeAheadField<String>(
       controller: lineData.productController,
       builder: (context, controller, focusNode) => TextField(
         controller: controller,
         focusNode: focusNode,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-        textDirection: TextDirection.rtl,
+        style: context.defaultTextStyle,
         decoration: InputDecoration(
-          hintText: 'Search product...',
+          hintText: context.l10n.searchProductHint,
           prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
+            horizontal: AppGaps.md,
+            vertical: AppGaps.sm,
           ),
           isDense: true,
         ),
@@ -517,7 +623,7 @@ class _InvoiceLineCard extends StatelessWidget {
         return ListTile(
           dense: true,
           title: Text(
-            '${product.model}: $name',
+            context.l10n.productSuggestion(product.model, name),
             style: context.textTheme.bodyLarge,
           ),
         );
@@ -530,9 +636,9 @@ class _InvoiceLineCard extends StatelessWidget {
           )
           .map((e) => e.name)
           .toList(),
-      emptyBuilder: (_) => const Padding(
-        padding: EdgeInsets.all(12),
-        child: Text('No products found'),
+      emptyBuilder: (_) => Padding(
+        padding: const EdgeInsets.all(AppGaps.md),
+        child: Text(context.l10n.noProductsFound),
       ),
     );
   }
@@ -543,34 +649,45 @@ class _CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final String? suffix;
+  final bool allowDecimal;
   const _CustomTextField({
     required this.label,
     required this.controller,
     required this.onChanged,
     this.suffix,
+    this.allowDecimal = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: TextInputType.number,
-      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      keyboardType: allowDecimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.number,
+      style: context.defaultTextStyle.copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+      inputFormatters: [
+        if (allowDecimal)
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+        else
+          FilteringTextInputFormatter.digitsOnly,
+      ],
       decoration: InputDecoration(
         labelText: label,
         suffixText: suffix,
         enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(width: 1, color: context.colorScheme.outline),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(width: 2, color: context.colorScheme.primary),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
+          horizontal: AppGaps.md,
+          vertical: AppGaps.sm,
         ),
         isDense: true,
       ),
@@ -589,17 +706,17 @@ class _LineNumber extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      width: 28,
-      height: 28,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      padding: const EdgeInsets.all(AppGaps.xs),
       decoration: BoxDecoration(
         color: colors.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadii.control),
       ),
       child: Center(
         child: Text(
           '$index',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
+          style: context.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
             color: colors.onPrimaryContainer,
           ),
         ),
@@ -622,24 +739,38 @@ class _TotalBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colors.primaryContainer.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppGaps.md,
+        vertical: AppGaps.sm,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text('Total: '),
           Text(
-            formatNumber(total),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: colors.primary,
+            context.l10n.total,
+            style: context.textTheme.labelMedium?.copyWith(
+              color: colors.onPrimaryContainer.withValues(alpha: 0.8),
             ),
-            overflow: TextOverflow.ellipsis,
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: Text(
+              formatNumber(total),
+              key: ValueKey(total),
+              style: context.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colors.onPrimaryContainer,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

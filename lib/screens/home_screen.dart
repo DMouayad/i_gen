@@ -13,6 +13,7 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
 import 'package:i_gen/widgets/product_pricing_table.dart';
+import 'package:i_gen/widgets/sync_spinner.dart';
 
 const _productsPageIndex = 1;
 const _pricingPageIndex = 2;
@@ -25,11 +26,6 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  final textStyle = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.bold,
-    color: Colors.black,
-  );
   InvoiceDetailsController? currentInvoiceDetailsController;
   final unsavedProductCountNotifier = ValueNotifier<int>(0);
   final navigationConfirmedStreamController = StreamController<bool>();
@@ -44,8 +40,8 @@ class _HomeState extends State<Home> {
     if (currentInvoiceDetailsController?.hasUnsavedChanges == true) {
       _showNavConfirmationDialog(
         context,
-        title: 'Invoice was not saved',
-        content: 'Your invoice has unsaved changes, do you want to continue?',
+        title: context.l10n.invoiceUnsavedTitle,
+        content: context.l10n.invoiceUnsavedMessage,
       ).then((confirmed) {
         if (confirmed ?? false) {
           currentInvoiceDetailsController?.hasUnsavedChanges = false;
@@ -56,8 +52,8 @@ class _HomeState extends State<Home> {
       if (unsavedProductCountNotifier.value > 0) {
         _showNavConfirmationDialog(
           context,
-          title: 'Unsaved Products',
-          content: 'You have unsaved products, do you want to continue?',
+          title: context.l10n.unsavedProductsTitle,
+          content: context.l10n.unsavedProductsMessage,
         ).then((confirmed) {
           if (confirmed ?? false) {
             unsavedProductCountNotifier.value = 0;
@@ -69,9 +65,8 @@ class _HomeState extends State<Home> {
       if (unsavedPricingCategoryCountNotifier.value > 0) {
         _showNavConfirmationDialog(
           context,
-          title: 'Unsaved Pricing Category',
-          content:
-              'You have unsaved pricing category, do you want to continue?',
+          title: context.l10n.unsavedPricingCategoryTitle,
+          content: context.l10n.unsavedPricingCategoryMessage,
         ).then((confirmed) {
           if (confirmed ?? false) {
             unsavedPricingCategoryCountNotifier.value = 0;
@@ -81,8 +76,8 @@ class _HomeState extends State<Home> {
       } else if (unsavedProductPricingCountNotifier.value > 0) {
         _showNavConfirmationDialog(
           context,
-          title: 'Unsaved Product Pricing',
-          content: 'You have unsaved product pricing, do you want to continue?',
+          title: context.l10n.unsavedProductPricingTitle,
+          content: context.l10n.unsavedProductPricingMessage,
         ).then((confirmed) {
           if (confirmed ?? false) {
             unsavedProductPricingCountNotifier.value = 0;
@@ -142,26 +137,31 @@ class _HomeState extends State<Home> {
               ? null
               : BottomNavigationBar(
                   currentIndex: navListener!.value,
-                  items: const [
+                  items: [
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.inventory),
-                      label: 'Invoices',
+                      icon: Icon(Icons.inventory_2_outlined),
+                      activeIcon: Icon(Icons.inventory_2),
+                      label: context.l10n.navInvoices,
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.list_alt),
-                      label: 'Products',
+                      icon: Icon(Icons.list_alt_outlined),
+                      activeIcon: Icon(Icons.list_alt),
+                      label: context.l10n.navProducts,
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.currency_exchange),
-                      label: 'Pricing',
+                      icon: Icon(Icons.currency_exchange_outlined),
+                      activeIcon: Icon(Icons.currency_exchange),
+                      label: context.l10n.navPricing,
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.receipt_long_outlined),
-                      label: 'Orders',
+                      activeIcon: Icon(Icons.receipt_long),
+                      label: context.l10n.navOrders,
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.settings),
-                      label: 'Settings',
+                      icon: Icon(Icons.settings_outlined),
+                      activeIcon: Icon(Icons.settings),
+                      label: context.l10n.navSettings,
                     ),
                   ],
                   onTap: navListener!.updateIndex,
@@ -172,65 +172,69 @@ class _HomeState extends State<Home> {
                 if (context.showNavigationRail)
                   NavigationRail(
                     selectedIndex: navListener!.value,
-                    unselectedLabelTextStyle: textStyle,
-                    selectedLabelTextStyle: textStyle.copyWith(
-                      color: context.colorScheme.primary,
-                    ),
+                    unselectedLabelTextStyle: context.textTheme.labelLarge,
+                    selectedLabelTextStyle: context.textTheme.labelLarge
+                        ?.copyWith(color: context.colorScheme.primary),
                     groupAlignment: 0,
                     extended: true,
                     onDestinationSelected: navListener!.updateIndex,
                     useIndicator: true,
 
                     trailing: Padding(
-                      padding: const EdgeInsets.only(top: 24.0),
-                      child: FilledButton.icon(
-                        style: ButtonStyle(
-                          minimumSize: WidgetStatePropertyAll(Size(200, 55)),
-                          textStyle: WidgetStatePropertyAll(
-                            TextStyle(fontSize: 18),
+                      padding: const EdgeInsets.only(top: AppGaps.lg),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SyncSpinner(),
+                          FilledButton.icon(
+                            style: const ButtonStyle(
+                              minimumSize: WidgetStatePropertyAll(
+                                Size(200, 56),
+                              ),
+                            ),
+                            onPressed: _onCreateNew,
+                            icon: const Icon(Icons.add),
+                            label: Text(context.l10n.addItem),
                           ),
-                        ),
-                        onPressed: _onCreateNew,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add'),
+                        ],
                       ),
                     ),
                     backgroundColor: context.colorScheme.surface,
-                    leading: const SizedBox(
-                      width: 210,
+                    leading: SizedBox(
+                      width: 208,
                       child: Text(
                         'IGen',
-                        style: TextStyle(
-                          fontSize: 28,
+                        style: context.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.start,
                       ),
                     ),
-                    destinations: const <NavigationRailDestination>[
+                    destinations: <NavigationRailDestination>[
                       NavigationRailDestination(
-                        icon: Icon(Icons.inventory),
-                        label: Text('Invoices'),
+                        icon: Icon(Icons.inventory_2_outlined),
+                        selectedIcon: Icon(Icons.inventory_2),
+                        label: Text(context.l10n.navInvoices),
                       ),
                       NavigationRailDestination(
                         icon: Icon(Icons.list_alt_outlined),
                         selectedIcon: Icon(Icons.list_alt),
-                        label: Text('Products'),
+                        label: Text(context.l10n.navProducts),
                       ),
                       NavigationRailDestination(
-                        icon: Icon(Icons.currency_exchange),
+                        icon: Icon(Icons.currency_exchange_outlined),
                         selectedIcon: Icon(Icons.currency_exchange),
-                        label: Text('Pricing'),
+                        label: Text(context.l10n.navPricing),
                       ),
                       NavigationRailDestination(
                         icon: Icon(Icons.receipt_long_outlined),
                         selectedIcon: Icon(Icons.receipt_long),
-                        label: Text('Orders'),
+                        label: Text(context.l10n.navOrders),
                       ),
                       NavigationRailDestination(
                         icon: Icon(Icons.settings_outlined),
                         selectedIcon: Icon(Icons.settings),
-                        label: Text('Settings'),
+                        label: Text(context.l10n.navSettings),
                       ),
                     ],
                   ),
@@ -240,8 +244,10 @@ class _HomeState extends State<Home> {
                     padding: context.isMobile
                         ? EdgeInsets.zero
                         : EdgeInsets.symmetric(
-                            vertical: navListener!.value == 0 ? 20 : 50,
-                            horizontal: 24,
+                            vertical: navListener!.value == 0
+                                ? AppGaps.lg
+                                : AppGaps.xl,
+                            horizontal: AppGaps.lg,
                           ),
                     child: switch (navListener!.value) {
                       0 => Center(
@@ -267,7 +273,7 @@ class _HomeState extends State<Home> {
                       ),
                       3 => const OrdersScreen(),
                       4 => const SettingsScreen(),
-                      _ => const Center(child: Text('404')),
+                      _ => Center(child: Text(context.l10n.notFoundLabel)),
                     },
                   ),
                 ),
@@ -288,29 +294,37 @@ class _HomeState extends State<Home> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.dialog),
+          ),
           title: Text(
             title,
-            style: textStyle.copyWith(
-              fontSize: 20,
+            style: context.textTheme.titleLarge?.copyWith(
               color: context.colorScheme.error,
             ),
           ),
-          content: Text(content, style: textStyle),
+          content: Text(content, style: context.textTheme.bodyLarge),
           actions: [
             TextButton(
-              onPressed: () {
-                navigationConfirmedStreamController.add(true);
-                Navigator.of(context).pop(true);
-              },
-              child: const Text('Yes'),
-            ),
-            TextButton(
+              style: const ButtonStyle(
+                minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+              ),
               onPressed: () {
                 navigationConfirmedStreamController.add(false);
 
                 Navigator.of(context).pop(false);
               },
-              child: const Text('No'),
+              child: Text(context.l10n.dialogNo),
+            ),
+            TextButton(
+              style: const ButtonStyle(
+                minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+              ),
+              onPressed: () {
+                navigationConfirmedStreamController.add(true);
+                Navigator.of(context).pop(true);
+              },
+              child: Text(context.l10n.dialogYes),
             ),
           ],
         );

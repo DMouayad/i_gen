@@ -10,6 +10,16 @@ class ProductsController {
 
   Map<String, Product> get products => _products;
 
+  /// Re-reads the catalog from the database (e.g. after a sync pulled
+  /// rows). The map object stays identical so existing readers keep working;
+  /// callers rebuild their rows/lists afterwards via setState.
+  Future<void> reload() async {
+    final fresh = await GetIt.I.get<ProductRepo>().getProducts();
+    _products
+      ..clear()
+      ..addEntries(fresh.map((e) => MapEntry(e.model, e)));
+  }
+
   Future<void> save({required String model, required String name}) async {
     final newProduct = await GetIt.I.get<ProductRepo>().insertProduct(
       model: model,

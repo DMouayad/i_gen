@@ -11,13 +11,23 @@ class ReadOnlyBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: context.colorScheme.surfaceContainerHighest,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: BorderSide(
+          color: context.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppGaps.md,
+          vertical: AppGaps.sm,
+        ),
         child: Row(
           children: [
             const Icon(Icons.visibility_outlined, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppGaps.sm),
             Expanded(child: Text(text)),
           ],
         ),

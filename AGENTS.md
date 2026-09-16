@@ -18,7 +18,7 @@
 
 ## What we don't do
 
-- No drift migration (sqflite stays). No PowerSync / community sync wrappers. No Supabase Realtime yet (reconnect-pull is the freshness mechanism). No conflict UI — last-write-wins is silent by decision.
+- No drift migration (sqflite stays). No PowerSync / community sync wrappers. Supabase Realtime is orders-only (new-order alerts via the order watcher; the sync domain stays reconnect-pull). No conflict UI — last-write-wins is silent by decision.
 - No new dependencies without approval. No speculative generality: build what the specs (`specs/`) ask, nothing more.
 
 ## Specs

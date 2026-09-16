@@ -98,6 +98,11 @@ ON ${DbConstants.tableOutbox} (${DbConstants.columnCreatedAt})''');
   /// called AFTER the row write (or delete) so the payload reflects the new
   /// state.
   ///
+  /// Pass [opIdOverride] for content-addressed ops (catalog seeds): every
+  /// install computes the same key, so cross-device pushes converge on one
+  /// server row via the `client_op_id` upsert instead of duplicating.
+  /// Re-queuing the same override replaces the pending op (idempotent).
+  ///
   /// Never throws for sync reasons: if the payload cannot be read, a
   /// minimal `{'_id': rowId}` payload is queued so the engine still learns
   /// the row changed.
@@ -105,6 +110,7 @@ ON ${DbConstants.tableOutbox} (${DbConstants.columnCreatedAt})''');
     DatabaseExecutor db, {
     required MutationRef ref,
     Map<String, Object?>? payloadOverride,
+    String? opIdOverride,
   }) async {
     await ensureOutboxTable(db);
     Map<String, Object?> payload;
@@ -132,7 +138,7 @@ ON ${DbConstants.tableOutbox} (${DbConstants.columnCreatedAt})''');
       );
     }
 
-    final opId = DbConstants.newOpId();
+    final opId = opIdOverride ?? DbConstants.newOpId();
     await db.insert(DbConstants.tableOutbox, {
       DbConstants.columnOpId: opId,
       DbConstants.columnTableName: ref.table,
@@ -142,7 +148,7 @@ ON ${DbConstants.tableOutbox} (${DbConstants.columnCreatedAt})''');
       DbConstants.columnCreatedAt: nowMillis(),
       DbConstants.columnAttempts: 0,
       DbConstants.columnLastError: null,
-    });
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     // Debounced auto-push (~2s) via the trigger; the engine registers its
     // public syncNow() there. Repos never import the engine.

@@ -5,6 +5,7 @@ import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/auth/supabase_config.dart';
 import 'package:i_gen/models/order.dart';
 import 'package:i_gen/repos/orders_repo.dart';
+import 'package:i_gen/utils/context_extensions.dart';
 
 /// Staff orders surface (Phase 10): read-only, online-first.
 ///
@@ -19,8 +20,26 @@ class OrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!SupabaseConfig.isConfigured) {
-      return const Center(
-        child: Text('Orders need sync configuration — the app works offline.'),
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppGaps.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.cloud_off_outlined,
+                size: 48,
+                color: context.colorScheme.outline,
+              ),
+              const SizedBox(height: AppGaps.sm),
+              Text(
+                context.l10n.ordersNeedSyncConfig,
+                textAlign: TextAlign.center,
+                style: context.textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
       );
     }
     final auth = AuthService.instance;
@@ -29,24 +48,47 @@ class OrdersScreen extends StatelessWidget {
       initialData: auth.currentRole,
       builder: (context, snapshot) {
         if (!auth.isSignedIn) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'Sign in from Settings to view orders.',
-                textAlign: TextAlign.center,
+              padding: const EdgeInsets.all(AppGaps.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.login_outlined,
+                    size: 48,
+                    color: context.colorScheme.outline,
+                  ),
+                  const SizedBox(height: AppGaps.sm),
+                  Text(
+                    context.l10n.ordersSignInPrompt,
+                    textAlign: TextAlign.center,
+                    style: context.textTheme.bodyLarge,
+                  ),
+                ],
               ),
             ),
           );
         }
         if (snapshot.data == UserRole.distributor) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'Distributors place and follow orders in the web app — '
-                'open your welcome link to continue there.',
-                textAlign: TextAlign.center,
+              padding: const EdgeInsets.all(AppGaps.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.language_outlined,
+                    size: 48,
+                    color: context.colorScheme.outline,
+                  ),
+                  const SizedBox(height: AppGaps.sm),
+                  Text(
+                    context.l10n.ordersDistributorGuidance,
+                    textAlign: TextAlign.center,
+                    style: context.textTheme.bodyLarge,
+                  ),
+                ],
               ),
             ),
           );
@@ -55,10 +97,10 @@ class OrdersScreen extends StatelessWidget {
           length: 2,
           child: Column(
             children: [
-              const TabBar(
+              TabBar(
                 tabs: [
-                  Tab(text: 'Orders'),
-                  Tab(text: 'Distributors'),
+                  Tab(text: context.l10n.navOrders),
+                  Tab(text: context.l10n.distributors),
                 ],
               ),
               Expanded(
@@ -112,17 +154,22 @@ class _OrdersListState extends State<_OrdersList> {
         }
         if (snapshot.hasError) {
           final offline = snapshot.error is SocketException;
+          final String message = offline
+              ? context.l10n.noConnectionOrders
+              : context.l10n.couldNotLoadOrders('${snapshot.error}');
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  offline
-                      ? 'No connection — connect to view live orders.'
-                      : 'Could not load orders: ${snapshot.error}',
+                Text(message),
+                const SizedBox(height: AppGaps.sm),
+                OutlinedButton(
+                  style: const ButtonStyle(
+                    minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                  ),
+                  onPressed: _retry,
+                  child: Text(context.l10n.retry),
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton(onPressed: _retry, child: const Text('Retry')),
               ],
             ),
           );
@@ -134,7 +181,29 @@ class _OrdersListState extends State<_OrdersList> {
           return Column(
             children: [
               _filterRow(),
-              const Expanded(child: Center(child: Text('No orders yet.'))),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppGaps.lg),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 48,
+                          color: context.colorScheme.outline,
+                        ),
+                        const SizedBox(height: AppGaps.sm),
+                        Text(
+                          context.l10n.noOrdersYet,
+                          textAlign: TextAlign.center,
+                          style: context.textTheme.bodyLarge,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           );
         }
@@ -145,15 +214,32 @@ class _OrdersListState extends State<_OrdersList> {
               child: RefreshIndicator(
                 onRefresh: () async => _retry(),
                 child: ListView.builder(
+                  padding: const EdgeInsets.all(AppGaps.sm),
                   itemCount: orders.length,
                   itemBuilder: (context, index) {
                     final order = orders[index];
                     return Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.card),
+                      ),
                       child: ListTile(
                         leading: const Icon(Icons.receipt_long_outlined),
-                        title: Text('${order.total} ${order.currency}'),
+                        title: Text(
+                          context.l10n.orderAmountTitle(
+                            order.total.toString(),
+                            order.currency,
+                          ),
+                        ),
                         subtitle: Text(
-                          '${order.status} · ${order.createdAt?.toLocal().toString().split('.').first ?? ''}',
+                          context.l10n.orderSubtitle(
+                            order.status,
+                            order.createdAt
+                                    ?.toLocal()
+                                    .toString()
+                                    .split('.')
+                                    .first ??
+                                '',
+                          ),
                         ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _showDetail(order),
@@ -172,20 +258,28 @@ class _OrdersListState extends State<_OrdersList> {
   Widget _filterRow() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppGaps.sm),
       child: Row(
         children: [
           ChoiceChip(
-            label: const Text('All'),
+            label: Text(context.l10n.filterAll),
             selected: _statusFilter == null,
+            materialTapTargetSize: MaterialTapTargetSize.padded,
             onSelected: (_) => setState(() => _statusFilter = null),
           ),
           for (final status in _statuses)
             Padding(
-              padding: const EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.only(left: AppGaps.sm),
               child: ChoiceChip(
-                label: Text(status),
+                label: Text(switch (status) {
+                  'pending' => context.l10n.orderStatusPending,
+                  'confirmed' => context.l10n.orderStatusConfirmed,
+                  'delivered' => context.l10n.orderStatusDelivered,
+                  'cancelled' => context.l10n.orderStatusCancelled,
+                  _ => status,
+                }),
                 selected: _statusFilter == status,
+                materialTapTargetSize: MaterialTapTargetSize.padded,
                 onSelected: (_) => setState(
                   () => _statusFilter = _statusFilter == status ? null : status,
                 ),
@@ -202,34 +296,43 @@ class _OrdersListState extends State<_OrdersList> {
     try {
       items = await _repo.getOrderItems(order.id);
     } catch (e) {
-      error = e is SocketException ? 'No connection.' : '$e';
+      error = e is SocketException
+          ? context.l10n.noConnectionShort
+          : context.l10n.unexpectedError('$e');
     }
     if (!mounted) return;
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Order · ${order.status}'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.dialog),
+        ),
+        title: Text(context.l10n.orderDetailTitle(order.status)),
         content: SizedBox(
           width: 400,
           child: error != null
               ? Text(error)
               : items.isEmpty
-              ? const Text('No lines on this order.')
+              ? Text(context.l10n.orderNoLines)
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     for (final item in items)
                       ListTile(
                         dense: true,
-                        title: Text('×${item.amount}'),
+                        title: Text(
+                          context.l10n.orderItemAmount(item.amount.toString()),
+                        ),
                         trailing: Text('${item.price}'),
                       ),
                     const Divider(),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        'Total: ${order.total} ${order.currency}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        '${context.l10n.total}: ${order.total} ${order.currency}',
+                        style: context.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -237,8 +340,11 @@ class _OrdersListState extends State<_OrdersList> {
         ),
         actions: [
           TextButton(
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+            ),
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(context.l10n.close),
           ),
         ],
       ),
@@ -284,28 +390,58 @@ class _DistributorsListState extends State<_DistributorsList> {
               children: [
                 Text(
                   offline
-                      ? 'No connection — connect to view distributors.'
-                      : 'Could not load distributors: ${snapshot.error}',
+                      ? context.l10n.noConnectionDistributors
+                      : context.l10n.couldNotLoadDistributors(
+                          '${snapshot.error}',
+                        ),
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton(onPressed: _retry, child: const Text('Retry')),
+                const SizedBox(height: AppGaps.sm),
+                OutlinedButton(
+                  style: const ButtonStyle(
+                    minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                  ),
+                  onPressed: _retry,
+                  child: Text(context.l10n.retry),
+                ),
               ],
             ),
           );
         }
         final items = snapshot.data ?? const <Distributor>[];
         if (items.isEmpty) {
-          return const Center(
-            child: Text('No distributors yet — invite one from Settings.'),
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppGaps.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.storefront_outlined,
+                    size: 48,
+                    color: context.colorScheme.outline,
+                  ),
+                  const SizedBox(height: AppGaps.sm),
+                  Text(
+                    context.l10n.noDistributorsYet,
+                    textAlign: TextAlign.center,
+                    style: context.textTheme.bodyLarge,
+                  ),
+                ],
+              ),
+            ),
           );
         }
         return RefreshIndicator(
           onRefresh: () async => _retry(),
           child: ListView.builder(
+            padding: const EdgeInsets.all(AppGaps.sm),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final d = items[index];
               return Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                ),
                 child: ListTile(
                   leading: const Icon(Icons.storefront_outlined),
                   title: Text('${d.nameEn} · ${d.nameAr}'),

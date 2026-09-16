@@ -174,7 +174,7 @@ WHERE ${DbConstants.columnLastError} IS NOT NULL
       // Single query per spec: un-synced, not deleted, not already queued.
       final rows = await db.rawQuery(
         '''
-SELECT ${DbConstants.columnId} AS _id
+SELECT ${DbConstants.columnId} AS _id, ${DbConstants.columnProductModel} AS model
 FROM ${DbConstants.tableProduct}
 WHERE ${DbConstants.columnRemoteId} IS NULL
   AND ${DbConstants.columnIsDeleted} = 0
@@ -188,20 +188,30 @@ WHERE ${DbConstants.columnRemoteId} IS NULL
       );
 
       final ids = <int>[];
+      final models = <int, String>{};
       for (final row in rows) {
         final id = row['_id'] as int?;
-        if (id != null) ids.add(id);
+        final model = row['model'] as String?;
+        if (id != null && model != null) {
+          ids.add(id);
+          models[id] = model;
+        }
       }
       if (ids.isEmpty) return 0;
       // One transaction: all-or-none, one poke at the end via recordMutation.
       await db.transaction((txn) async {
         for (final id in ids) {
+          // Same deterministic key as the seeder: converging, not duplicating.
           await SyncMetadata.recordMutation(
             txn,
             ref: MutationRef(
               table: DbConstants.tableProduct,
               rowId: id,
               op: DbConstants.opInsert,
+            ),
+            opIdOverride: DbConstants.seedOpId(
+              DbConstants.tableProduct,
+              models[id]!,
             ),
           );
         }

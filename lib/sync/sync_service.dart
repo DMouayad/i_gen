@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'package:i_gen/db.dart';
+import 'package:i_gen/repos/sync_trigger.dart' as ui;
 import 'auth_info.dart';
 import 'remote_gateway.dart';
 
@@ -227,7 +228,24 @@ class SyncService {
 
   Future<SyncResult> _runSync() async {
     final ownerId = _auth.ownerId;
-    if (ownerId == null) return SyncResult.skippedUnauthenticated();
+    if (ownerId == null) {
+      // Logged out: nothing to do, and lastSyncAt must NOT advance (a
+      // manual tap would otherwise stamp a fresh "synced" time for a run
+      // that synced nothing — SyncTrigger only stamps when still syncing,
+      // so publishing the unchanged state here holds the line).
+      try {
+        ui.SyncTrigger.instance.report(
+          ui.SyncTrigger.instance.state.value.copyWith(
+            status: ui.SyncStatus.synced,
+            clearError: true,
+            uploadedByTable: const {},
+            downloadedByTable: const {},
+            skippedByTable: const {},
+          ),
+        );
+      } catch (_) {}
+      return SyncResult.skippedUnauthenticated();
+    }
 
     _emit(
       SyncStatus(
@@ -239,6 +257,7 @@ class SyncService {
 
     final pushed = <String, int>{};
     final pulled = <String, int>{};
+    final skipped = <String, int>{};
     final errors = <String>[];
 
     for (final table in SyncTables.orderedLocalTables) {
@@ -258,7 +277,9 @@ class SyncService {
       // attempts/last_error, retried later, surfaced only when parked);
       // downloads must not wait for uploads.
       try {
-        pulled[table] = await _pullTable(table, ownerId);
+        final pull = await _pullTable(table, ownerId);
+        pulled[table] = pull.merged;
+        if (pull.skipped > 0) skipped[table] = pull.skipped;
       } catch (e) {
         errors.add('$table pull: $e');
       }
@@ -278,6 +299,23 @@ class SyncService {
         lastError: lastError,
       ),
     );
+    // Publish per-table up/down/skip counters + errors to the settings UI.
+    // Never throws: observability must not break sync.
+    try {
+      ui.SyncTrigger.instance.report(
+        ui.SyncTrigger.instance.state.value.copyWith(
+          status: lastError == null
+              ? ui.SyncStatus.synced
+              : ui.SyncStatus.error,
+          lastSyncAt: _lastSyncAt,
+          lastError: lastError,
+          clearError: lastError == null,
+          uploadedByTable: pushed,
+          downloadedByTable: pulled,
+          skippedByTable: skipped,
+        ),
+      );
+    } catch (_) {}
 
     if (lastError == null) {
       return SyncResult.ok(pushedPerTable: pushed, pulledPerTable: pulled);
@@ -404,6 +442,14 @@ class SyncService {
       _notBeforeMillis.remove(opId);
       return _OpOutcome.acked;
     } catch (e) {
+      // Best-effort seed pushes refused by role policy (e.g. employee hits
+      // the catalog admin_write rule) are dropped, not parked: the device
+      // converges onto the admin's uuids via pull, and parking 25
+      // unfixable ops would paint every non-admin device red forever.
+      if (DbConstants.isSeedOpId(table, opId) && _isPermissionDenied('$e')) {
+        await _deleteOp(opId);
+        return _OpOutcome.failed;
+      }
       await _recordOpFailure(opId, '$e');
       return _OpOutcome.failed;
     }
@@ -525,6 +571,18 @@ class SyncService {
     // At the cap the op stays parked with last_error, skipped by _pushTable.
   }
 
+  /// True when a push error is a role-policy refusal rather than a
+  /// transient failure: PostgREST 42501 ("permission denied"), RLS policy
+  /// violations, and test-fake equivalents. Matched loosely on purpose —
+  /// supabase_flutter surfaces these as PostgrestException text.
+  static bool _isPermissionDenied(String error) {
+    final lower = error.toLowerCase();
+    return lower.contains('42501') ||
+        lower.contains('permission denied') ||
+        lower.contains('row-level security') ||
+        lower.contains('rls denied');
+  }
+
   bool _inBackoff(String opId) {
     final notBefore = _notBeforeMillis[opId];
     if (notBefore == null) return false;
@@ -537,10 +595,13 @@ class SyncService {
 
   // --------------------------------------------------------------- pull ---
 
-  /// Pulls one table's delta and merges it (LWW). Returns merged-row count.
+  /// Pulls one table's delta and merges it (LWW). Returns merged/skip counts.
   /// The `sync_state` checkpoint advances only after the merge transaction
   /// commits, and only over rows actually pulled.
-  Future<int> _pullTable(String table, String ownerId) async {
+  Future<({int merged, int skipped})> _pullTable(
+    String table,
+    String ownerId,
+  ) async {
     final lastPull = await _lastPullAt(table);
     final remoteTable = SyncTables.remoteFor(table);
     final rows = await _remote.pullTable(
@@ -548,12 +609,13 @@ class SyncService {
       ownerId: ownerId,
       lastPullAtMillis: lastPull,
     );
-    if (rows.isEmpty) return 0;
+    if (rows.isEmpty) return (merged: 0, skipped: 0);
 
     final localColumns = await _localColumns(table);
     var maxPulledAt = lastPull;
     var merged = 0;
     var skipped = 0;
+    int? minSkippedAt;
 
     await _db.transaction((txn) async {
       for (final remote in rows) {
@@ -572,15 +634,22 @@ class SyncService {
         );
         if (outcome) {
           merged++;
-          final checkpoint = maxPulledAt;
-          if (checkpoint == null || remoteAt > checkpoint) {
-            maxPulledAt = remoteAt;
-          }
         } else {
-          // Skipped (orphan child, stale LWW loser): the checkpoint does NOT
-          // advance over it, so it is retried on the next run instead of
-          // being silently dropped.
+          // Skipped (orphan child, stale LWW loser): counted and retried,
+          // never silently dropped (see checkpoint rule below).
           skipped++;
+          if (minSkippedAt == null || remoteAt < minSkippedAt!) {
+            minSkippedAt = remoteAt;
+          }
+          continue;
+        }
+        // Advance only over merged rows OLDER than every skip: jumping past
+        // an older orphan would exclude it from the next delta forever.
+        final heldAt = minSkippedAt;
+        if (heldAt != null && remoteAt >= heldAt) continue;
+        final checkpoint = maxPulledAt;
+        if (checkpoint == null || remoteAt > checkpoint) {
+          maxPulledAt = remoteAt;
         }
       }
     });
@@ -598,7 +667,7 @@ class SyncService {
         DbConstants.columnLastPullAt: maxPulledAt,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    return merged;
+    return (merged: merged, skipped: skipped);
   }
 
   /// Merges one remote row. Returns true when the local store changed.
@@ -658,7 +727,52 @@ class SyncService {
     values[DbConstants.columnIsDeleted] = 0;
 
     if (existing.isEmpty) {
-      await txn.insert(table, values);
+      // No row with this server id. Catalog tables carry a natural key
+      // (product.model, price_category.name) that survives multi-device
+      // seeding: a twin row with a different server id must converge
+      // update-in-place instead of throwing the whole table pull away on
+      // UNIQUE(model/name). Without this, one conflicting row aborts the
+      // entire transaction and starves dependent tables (prices).
+      final twin = await _findNaturalTwin(txn, table, remote);
+      if (twin == null) {
+        await txn.insert(table, values);
+        return true;
+      }
+      final twinId = twin[DbConstants.columnId] as int;
+      final localAt = (twin[DbConstants.columnUpdatedAt] as int?) ?? 0;
+      if (remoteAt > localAt) {
+        // Newer twin: merge everything. Adopt the pulled server id when
+        // the local row was never synced (it has no twin of its own);
+        // otherwise keep the local id — the server holds duplicates and
+        // picking a winner locally cannot heal that (one-time server
+        // dedupe finishes the job). (values already carries the pulled
+        // id; drop it to keep the local one.)
+        if (twin[DbConstants.columnRemoteId] == null) {
+          values[DbConstants.columnRemoteId] = id;
+        } else {
+          values.remove(DbConstants.columnRemoteId);
+        }
+        await txn.update(
+          table,
+          values,
+          where: '${DbConstants.columnId} = ?',
+          whereArgs: [twinId],
+        );
+      } else if (twin[DbConstants.columnRemoteId] == null) {
+        // Older twin, but the local row was never synced: adopt the server
+        // identity anyway (nothing depends on the local id yet) while
+        // keeping the newer local content. This is what lets a device that
+        // could never push (e.g. employee, catalog writes are admin-only)
+        // converge onto the admin's uuids so prices resolve.
+        await txn.update(
+          table,
+          {DbConstants.columnRemoteId: id},
+          where: '${DbConstants.columnId} = ?',
+          whereArgs: [twinId],
+        );
+      }
+      // Converged (or already current): processed, not skipped, so the
+      // checkpoint advances instead of retrying forever.
       return true;
     }
     final localAt = (existing.first[DbConstants.columnUpdatedAt] as int?) ?? 0;
@@ -672,7 +786,47 @@ class SyncService {
       );
       return true;
     }
+    // Same-millisecond tie on the same server row (e.g. rows just pushed by
+    // this device and re-pulled on a first sync with no checkpoint yet):
+    // ties keep local content AND count as processed so the checkpoint
+    // advances instead of re-pulling the same rows on every run. The residual
+    // risk (two writers, same row, same millisecond, different content —
+    // the later write is dropped) is negligible next to permanent re-pull
+    // noise; server timestamps keep microsecond precision.
+    if (remoteAt == localAt) return true;
     return false;
+  }
+
+  /// Finds a local row with the same natural key as a pulled row that has
+  /// no `remote_id` match. Only catalog tables have natural keys
+  /// (`product.model`, `price_category.name`); every other table returns
+  /// null and takes the plain insert path. Tombstones never take this path
+  /// (handled by the caller): a delete for one server id must not remove a
+  /// local twin that maps to a different, still-live server row.
+  Future<Map<String, Object?>?> _findNaturalTwin(
+    Transaction txn,
+    String table,
+    Map<String, dynamic> remote,
+  ) async {
+    final String keyColumn;
+    final Object? keyValue;
+    if (table == DbConstants.tableProduct) {
+      keyColumn = DbConstants.columnProductModel;
+      keyValue = remote[keyColumn];
+    } else if (table == DbConstants.tablePriceCategory) {
+      keyColumn = DbConstants.columnPriceCategoryName;
+      keyValue = remote[keyColumn];
+    } else {
+      return null;
+    }
+    if (keyValue == null) return null;
+    final rows = await txn.query(
+      table,
+      where: '$keyColumn = ?',
+      whereArgs: [keyValue],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
   }
 
   /// Pull-side ack recovery (see [_mergeRow]): matches a pulled row's
@@ -794,7 +948,7 @@ class SyncService {
 enum _OpOutcome { acked, deferred, failed }
 
 /// Result of pushing one table: acked-op count plus whether any op failed
-/// (a failed push defers that table's pull to the next run — see [_runSync]).
+/// (recorded per-op with attempts/last_error; the pull runs regardless).
 typedef _PushOutcome = ({int acked, bool hadFailure});
 
 /// Normalizes a server/fake `updated_at` (millis int or ISO-8601 string).

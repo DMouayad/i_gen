@@ -8,8 +8,10 @@ import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/price_category.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
+import 'package:i_gen/repos/sync_trigger.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/read_only_banner.dart';
+import 'package:i_gen/widgets/sync_spinner.dart';
 import 'package:trina_grid/trina_grid.dart';
 
 class ProductPricingTable extends StatefulWidget {
@@ -33,8 +35,16 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
   List<PriceCategory> pricingCategories = [];
   final Set<int> dirtyRows = {};
 
-  final textStyle = TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
   bool _disposed = false;
+
+  TextStyle _cellTextStyle(BuildContext context) =>
+      context.textTheme.bodyLarge!.copyWith(
+        fontWeight: FontWeight.bold,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  TextStyle _columnTextStyle(BuildContext context) =>
+      _cellTextStyle(context).copyWith(color: context.colorScheme.primary);
 
   /// Role read-only mirror for renderers created outside build (title
   /// editors, header actions). Fail-open while signed out so local editing
@@ -72,21 +82,32 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
     });
   }
 
+  bool _columnsInitialized = false;
+  int _gridTick = 0;
+
+  /// Manual refresh (invoked after a sync): remount the grid so columns and
+  /// rows rebuild from the repos — but never drop unsaved edits, so a dirty
+  /// grid keeps its state (fresh data appears on next rebuild).
+  Future<void> _refresh() async {
+    if (_disposed || !mounted) return;
+    if (dirtyRows.isEmpty &&
+        widget.unsavedProductPricingCountNotifier.value == 0 &&
+        widget.unsavedPricingCategoryCountNotifier.value == 0) {
+      setState(() => _gridTick++);
+    }
+  }
+
   @override
-  void initState() {
-    super.initState();
-    final auth = AuthService.instance;
-    _readOnlyNotifier.value = auth.isSignedIn && !auth.canEditCatalog;
-    _roleSub = auth.currentRoleStream.listen((_) {
-      if (_disposed) return;
-      _readOnlyNotifier.value = auth.isSignedIn && !auth.canEditCatalog;
-      if (_gridReady) {
-        stateManager.setAutoEditing(!_readOnlyNotifier.value);
-      }
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Column titles need l10n (an inherited widget), which is illegal in
+    // initState. Build once here; later dependency changes (e.g. theme)
+    // must not rebuild columns or grid state would reset.
+    if (_columnsInitialized) return;
+    _columnsInitialized = true;
     columns.add(
       TrinaColumn(
-        title: 'Model',
+        title: context.l10n.productModel,
         field: 'model',
         type: TrinaColumnType.text(),
         width: 70,
@@ -138,18 +159,35 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
         },
       ),
     );
+  }
 
-    fetchCols().then((fetchedColumns) {
-      stateManager.insertColumns(2, fetchedColumns);
+  @override
+  void initState() {
+    super.initState();
+    final auth = AuthService.instance;
+    _readOnlyNotifier.value = auth.isSignedIn && !auth.canEditCatalog;
+    _roleSub = auth.currentRoleStream.listen((_) {
+      if (_disposed) return;
+      _readOnlyNotifier.value = auth.isSignedIn && !auth.canEditCatalog;
+      if (_gridReady) {
+        stateManager.setAutoEditing(!_readOnlyNotifier.value);
+      }
     });
-    fetchRows().then((fetchedRows) {
-      TrinaGridStateManager.initializeRowsAsync(columns, fetchedRows).then((
-        value,
-      ) {
-        stateManager.refRows.addAll(value);
-        stateManager.setShowLoading(false);
-      });
-    });
+    _loadGrid();
+  }
+
+  Future<void> _loadGrid() async {
+    final fetchedColumns = await fetchCols();
+    // must insert before building rows: fetchRows reads columns.skip(2)
+    stateManager.insertColumns(2, fetchedColumns);
+    final fetchedRows = await fetchRows();
+    final rows = await TrinaGridStateManager.initializeRowsAsync(
+      columns,
+      fetchedRows,
+    );
+    if (_disposed) return;
+    stateManager.refRows.addAll(rows);
+    stateManager.setShowLoading(false);
   }
 
   Future<List<TrinaColumn>> fetchCols() async {
@@ -180,8 +218,11 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
             valueListenable: _readOnlyNotifier,
             builder: (context, readOnly, _) {
               final label = Text(
-                '${rendererContext.column.title} (${currencies[currency]}) ',
-                style: textStyle,
+                context.l10n.priceCategoryColumnTitle(
+                  rendererContext.column.title,
+                  currencies[currency] ?? currency,
+                ),
+                style: _cellTextStyle(context),
               );
               if (readOnly) return Center(child: label);
               return TextButton.icon(
@@ -240,6 +281,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
             maxWidth: context.isMobile ? context.width : 920,
           ),
           child: TrinaGrid(
+            key: ValueKey(_gridTick),
             columns: columns,
             rows: [],
             onChanged: (TrinaGridOnChangedEvent event) {
@@ -253,15 +295,13 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
             },
             configuration: TrinaGridConfiguration(
               style: TrinaGridStyleConfig(
-                cellDirtyColor: Colors.amber[100]!,
+                cellDirtyColor: context.colorScheme.tertiaryContainer,
                 borderColor: context.colorScheme.surfaceDim,
                 gridBorderColor: context.colorScheme.surfaceDim,
-                gridBorderRadius: BorderRadius.circular(6),
-                cellTextStyle: textStyle,
-                columnTextStyle: textStyle.copyWith(
-                  color: context.colorScheme.primary,
-                ),
-                evenRowColor: Colors.white,
+                gridBorderRadius: BorderRadius.circular(AppRadii.card),
+                cellTextStyle: _cellTextStyle(context),
+                columnTextStyle: _columnTextStyle(context),
+                evenRowColor: context.colorScheme.surfaceContainerLowest,
                 oddRowColor: context.colorScheme.surface,
               ),
             ),
@@ -269,10 +309,8 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
               return ValueListenableBuilder<bool>(
                 valueListenable: _readOnlyNotifier,
                 builder: (context, readOnly, _) {
-                  if (readOnly) return const SizedBox.shrink();
                   return Container(
-                    height: 70,
-                    // width: 140,
+                    height: 48,
                     alignment: Alignment.centerRight,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -281,14 +319,15 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                           valueListenable:
                               widget.unsavedProductPricingCountNotifier,
                           builder: (context, value, child) {
-                            return value <= 0
+                            return value <= 0 || readOnly
                                 ? SizedBox.shrink()
                                 : TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      minimumSize: const Size(64, 48),
+                                    ),
                                     label: Text(
-                                      'Save All',
-                                      style: textStyle.copyWith(
-                                        color: context.colorScheme.primary,
-                                      ),
+                                      context.l10n.saveAllButton,
+                                      style: _columnTextStyle(context),
                                     ),
                                     icon: Icon(Icons.save),
                                     onPressed: () async {
@@ -335,50 +374,64 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
                                   );
                           },
                         ),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              left: BorderSide(
-                                color: context.colorScheme.surfaceDim,
+                        if (!readOnly)
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                left: BorderSide(
+                                  color: context.colorScheme.surfaceDim,
+                                ),
                               ),
+                            ),
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(64, 48),
+                              ),
+                              onPressed: () async {
+                                final currency = currencies.keys.first;
+
+                                final res = await showDialog(
+                                  context: context,
+                                  builder: (context) =>
+                                      _EditPriceCategoryDialog(
+                                        name: '',
+                                        currency: currency,
+                                        existingCategories: pricingCategories,
+                                      ),
+                                );
+                                if (res case (
+                                  int id,
+                                  String name,
+                                  String currency,
+                                )) {
+                                  final index = stateManager.refColumns.length;
+                                  final newCol = _getColumn(name, currency);
+                                  stateManager.insertColumns(index, [newCol]);
+                                  pricingCategories.add(
+                                    PriceCategory(
+                                      id: id,
+                                      name: name,
+                                      currency: currency,
+                                    ),
+                                  );
+                                }
+                              },
+                              label: Text(
+                                context.l10n.newPriceList,
+                                style: _cellTextStyle(context),
+                              ),
+                              icon: Icon(Icons.add_box),
                             ),
                           ),
-                          child: TextButton.icon(
-                            onPressed: () async {
-                              final currency = currencies.keys.first;
+                        Spacer(),
+                        const SyncSpinner(),
 
-                              final res = await showDialog(
-                                context: context,
-                                builder: (context) => _EditPriceCategoryDialog(
-                                  name: '',
-                                  currency: currency,
-                                  existingCategories: pricingCategories,
-                                ),
-                              );
-                              if (res case (
-                                int id,
-                                String name,
-                                String currency,
-                              )) {
-                                final index = stateManager.refColumns.length;
-                                final newCol = _getColumn(name, currency);
-                                stateManager.insertColumns(index, [newCol]);
-                                pricingCategories.add(
-                                  PriceCategory(
-                                    id: id,
-                                    name: name,
-                                    currency: currency,
-                                  ),
-                                );
-                              }
-                            },
-                            label: Text(
-                              'New List',
-                              style: textStyle.copyWith(
-                                // color: context.colorScheme.primary,
-                              ),
-                            ),
-                            icon: Icon(Icons.add_box),
+                        IconButton(
+                          tooltip: context.l10n.refresh,
+                          icon: const Icon(Icons.refresh),
+                          onPressed: () => SyncTrigger.instance.syncNow().then(
+                            (_) => _refresh(),
+                            onError: (_) => _refresh(),
                           ),
                         ),
                       ],
@@ -402,14 +455,11 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
           valueListenable: _readOnlyNotifier,
           builder: (context, readOnly, _) {
             if (!readOnly) return const SizedBox.shrink();
-            return const Positioned(
+            return Positioned(
               top: 0,
               left: 0,
               right: 0,
-              child: ReadOnlyBanner(
-                text:
-                    'Pricing is read-only for your role — ask an admin for changes.',
-              ),
+              child: ReadOnlyBanner(text: context.l10n.pricingReadOnlyMessage),
             );
           },
         ),
@@ -441,12 +491,6 @@ class _EditPriceCategoryDialog extends StatefulWidget {
 
 class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
   final formKey = GlobalKey<FormState>();
-  final textStyle = TextStyle(
-    fontSize: 20,
-    color: Colors.black,
-    fontWeight: FontWeight.w600,
-  );
-  final labelTextStyle = TextStyle(fontSize: 16, color: Colors.black);
   String newName = '';
   String newCurrency = '';
   @override
@@ -458,22 +502,28 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    const spacer = SizedBox(height: 20);
+    final inputTextStyle = context.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    final dialogTitleStyle = context.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    final spacer = SizedBox(height: AppGaps.md);
     return Dialog(
       child: Form(
         key: formKey,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 400, maxHeight: 350),
           child: ListView(
-            padding: EdgeInsets.all(50),
+            padding: EdgeInsets.all(AppGaps.md),
             children: [
               if (widget.priceCategoryId != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 20.0),
+                  padding: const EdgeInsets.only(bottom: AppGaps.md),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Edit or Delete this list'),
+                      Text(context.l10n.editOrDeleteList),
                       TextButton(
                         onPressed: () async {
                           await GetIt.I.get<PricingCategoryRepo>().delete(
@@ -494,29 +544,30 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
                             context.colorScheme.error,
                           ),
                         ),
-                        child: Text('Delete'),
+                        child: Text(context.l10n.deleteButton),
                       ),
                     ],
                   ),
                 ),
               TextFormField(
                 initialValue: widget.name,
-                style: textStyle,
+                style: inputTextStyle,
                 autofocus: true,
                 decoration: InputDecoration(
-                  labelText: 'Name',
-                  hintText: 'Enter name',
+                  labelText: context.l10n.priceCategoryNameLabel,
+                  hintText: context.l10n.priceCategoryNameHint,
+                  labelStyle: dialogTitleStyle,
                 ),
                 onChanged: (value) => newName = value,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Name is required';
+                    return context.l10n.nameRequiredError;
                   }
                   if (widget.existingCategories.any(
                     (element) =>
                         element.name == value && element.name != widget.name,
                   )) {
-                    return 'Name already exists';
+                    return context.l10n.nameAlreadyExistsError;
                   }
                   return null;
                 },
@@ -525,11 +576,12 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
               DropdownButtonFormField<String>(
                 initialValue: widget.currency,
                 decoration: InputDecoration(
-                  labelText: 'Currency',
-                  hintText: 'Enter currency',
+                  labelText: context.l10n.currencyLabel,
+                  hintText: context.l10n.currencyHint,
+                  labelStyle: dialogTitleStyle,
                 ),
                 isDense: false,
-                style: textStyle,
+                style: inputTextStyle,
 
                 items: currencies.entries
                     .map(
@@ -542,7 +594,7 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
                 },
               ),
 
-              SizedBox(height: 40),
+              SizedBox(height: AppGaps.xl),
 
               FilledButton.tonal(
                 onPressed: () {
@@ -563,7 +615,7 @@ class _EditPriceCategoryDialogState extends State<_EditPriceCategoryDialog> {
                         });
                   }
                 },
-                child: const Text('Save'),
+                child: Text(context.l10n.saveButton),
               ),
             ],
           ),

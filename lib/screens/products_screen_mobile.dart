@@ -3,8 +3,10 @@ import 'package:get_it/get_it.dart';
 import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/product.dart';
+import 'package:i_gen/repos/sync_trigger.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/read_only_banner.dart';
+import 'package:i_gen/widgets/sync_spinner.dart';
 
 class ProductsScreeMobile extends StatefulWidget {
   const ProductsScreeMobile({
@@ -41,6 +43,18 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
     });
   }
 
+  /// Manual refresh: sync, reload the catalog snapshot, refill the list.
+  /// Plain setState refill is safe here (no grid state to lose).
+  Future<void> _refresh() async {
+    await SyncTrigger.instance.syncNow();
+    await _productsController.reload();
+    if (!mounted) return;
+    setState(() {
+      _products = _productsController.products.values.toList();
+    });
+    _filterProducts();
+  }
+
   void _showEditDialog({Product? product}) async {
     final result = await showDialog<Product>(
       context: context,
@@ -52,14 +66,43 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
     }
   }
 
+  Future<void> _confirmDelete(Product product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.dialog),
+        ),
+        title: Text(context.l10n.deleteConfirmTitle),
+        content: Text(context.l10n.deleteConfirmMessage),
+        actions: [
+          TextButton(
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+            ),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.cancelButton),
+          ),
+          FilledButton(
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.deleteButton),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) _deleteProduct(product);
+  }
+
   void _deleteProduct(Product product) async {
     if (product.id != -1) {
       await _productsController.deleteProduct(product);
     }
-    setState(() {
-      _products.remove(product);
-      _filterProducts();
-    });
+    if (!mounted) return;
+    _products.remove(product);
+    _filterProducts();
   }
 
   void _saveProduct(Product product) async {
@@ -77,9 +120,6 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = context.isMobile
-        ? context.textTheme.titleMedium
-        : context.textTheme.titleLarge;
     final auth = AuthService.instance;
     return StreamBuilder<UserRole?>(
       stream: auth.currentRoleStream,
@@ -90,64 +130,101 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
         final readOnly = auth.isSignedIn && !auth.canEditCatalog;
         return Scaffold(
           appBar: AppBar(
-            title: Text('Products'),
-            backgroundColor: context.theme.scaffoldBackgroundColor,
+            title: Text(context.l10n.navProducts),
+            backgroundColor: context.colorScheme.surface,
             surfaceTintColor: context.colorScheme.surface,
-            actionsPadding: EdgeInsets.symmetric(horizontal: 4),
             actions: [
-              if (!readOnly)
-                TextButton.icon(
-                  style: ButtonStyle(
-                    minimumSize: context.isMobile
-                        ? null
-                        : WidgetStatePropertyAll(Size(200, 55)),
-                  ),
-                  label: Text('New Product', style: textStyle),
-                  icon: Icon(Icons.add),
-                  onPressed: _showEditDialog,
-                ),
+              IconButton(
+                tooltip: context.l10n.refresh,
+                icon: const Icon(Icons.refresh),
+                onPressed: _refresh,
+              ),
+              const SyncSpinner(),
             ],
           ),
+          floatingActionButton: readOnly
+              ? null
+              : FloatingActionButton.extended(
+                  onPressed: () => _showEditDialog(),
+                  icon: const Icon(Icons.add),
+                  label: Text(context.l10n.newProduct),
+                ),
           body: Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 1020),
+              constraints: const BoxConstraints(maxWidth: 1024),
               child: Column(
                 children: [
                   if (readOnly)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(8, 8, 8, 0),
-                      child: ReadOnlyBanner(
-                        text:
-                            'Catalog is read-only for your role — ask an admin for changes.',
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppGaps.sm,
+                        AppGaps.sm,
+                        AppGaps.sm,
+                        0,
                       ),
+                      child: ReadOnlyBanner(text: context.l10n.catalogReadOnly),
                     ),
                   Padding(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(AppGaps.sm),
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        labelText: 'Search',
-                        prefixIcon: Icon(Icons.search),
+                        labelText: context.l10n.searchLabel,
+                        prefixIcon: const Icon(Icons.search_outlined),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
+                          borderRadius: BorderRadius.circular(AppRadii.control),
                         ),
                       ),
                     ),
                   ),
                   Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        final product = _filteredProducts[index];
-                        return ProductListItem(
-                          product: product,
-                          showActions: !readOnly,
-                          onDelete: () => _deleteProduct(product),
-                          onEdit: () => _showEditDialog(product: product),
-                        );
-                      },
-                    ),
+                    child: _filteredProducts.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 48,
+                                  color: context.colorScheme.outline,
+                                ),
+                                const SizedBox(height: AppGaps.sm),
+                                Text(
+                                  context.l10n.noProductsFound,
+                                  textAlign: TextAlign.center,
+                                  style: context.textTheme.bodyLarge,
+                                ),
+                                if (!readOnly) ...[
+                                  const SizedBox(height: AppGaps.md),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size(64, 48),
+                                    ),
+                                    onPressed: () => _showEditDialog(),
+                                    icon: const Icon(Icons.add),
+                                    label: Text(context.l10n.newProduct),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _refresh,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(AppGaps.sm),
+                              itemCount: _filteredProducts.length,
+                              itemBuilder: (context, index) {
+                                final product = _filteredProducts[index];
+                                return ProductListItem(
+                                  product: product,
+                                  showActions: !readOnly,
+                                  onDelete: () => _confirmDelete(product),
+                                  onEdit: () =>
+                                      _showEditDialog(product: product),
+                                );
+                              },
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -183,15 +260,17 @@ class ProductListItem extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 2.0),
+      margin: const EdgeInsets.symmetric(vertical: AppGaps.xs),
       color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-
       shape: RoundedRectangleBorder(
         side: BorderSide(width: 0.5, color: context.colorScheme.outline),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppGaps.md,
+          vertical: AppGaps.sm,
+        ),
         child: Row(
           children: [
             Expanded(
@@ -201,8 +280,14 @@ class ProductListItem extends StatelessWidget {
               ),
             ),
             if (showActions) ...[
-              IconButton(icon: Icon(Icons.edit), onPressed: onEdit),
-              IconButton(icon: Icon(Icons.delete), onPressed: onDelete),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: onEdit,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                onPressed: onDelete,
+              ),
             ],
           ],
         ),
@@ -254,7 +339,14 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   Widget build(BuildContext context) {
     final textStyle = context.textTheme.titleLarge;
     return AlertDialog(
-      title: Text(widget.product == null ? 'Add Product' : 'Edit Product'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.dialog),
+      ),
+      title: Text(
+        widget.product == null
+            ? context.l10n.addProduct
+            : context.l10n.editProduct,
+      ),
       content: Form(
         key: _formKey,
         child: Column(
@@ -263,22 +355,32 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             TextFormField(
               style: textStyle,
               controller: _modelController,
-              decoration: InputDecoration(labelText: 'Model'),
+              decoration: InputDecoration(
+                labelText: context.l10n.productModel,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a model';
+                  return context.l10n.productModelRequired;
                 }
                 return null;
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppGaps.sm),
             TextFormField(
               style: textStyle,
               controller: _nameController,
-              decoration: InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(
+                labelText: context.l10n.productNameColumn,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a name';
+                  return context.l10n.productNameRequired;
                 }
                 return null;
               },
@@ -288,10 +390,19 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       ),
       actions: [
         TextButton(
+          style: const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+          ),
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel'),
+          child: Text(context.l10n.cancelButton),
         ),
-        FilledButton(onPressed: _save, child: Text('Save')),
+        FilledButton(
+          style: const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+          ),
+          onPressed: _save,
+          child: Text(context.l10n.save),
+        ),
       ],
     );
   }

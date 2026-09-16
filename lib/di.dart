@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/db.dart';
 import 'package:i_gen/db_seeder.dart';
+import 'package:i_gen/orders/order_watcher.dart';
 import 'package:i_gen/repos/customer_repo.dart';
 import 'package:i_gen/repos/invoice_repo.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
@@ -65,6 +66,10 @@ Future<void> injectDependencies() async {
   // Sync engine wiring (gateway + service + triggers). Never throws, never
   // blocks: unwired means changes queue safely in the outbox.
   await SyncBootstrap.wire(db);
+
+  // Order watcher wiring (staff new-order alerts). Same contract: never
+  // throws, never blocks — unwired means no alerts, reads unaffected.
+  await OrderWatcher.wire();
 
   await GetIt.I.allReady();
 }
