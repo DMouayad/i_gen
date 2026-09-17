@@ -14,6 +14,8 @@ class NumberField extends StatelessWidget {
     this.allowDecimal = false,
     this.suffix,
     this.width,
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
@@ -21,6 +23,8 @@ class NumberField extends StatelessWidget {
   final bool allowDecimal;
   final String? suffix;
   final double? width;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +40,9 @@ class NumberField extends StatelessWidget {
       style: context.textTheme.bodyMedium?.copyWith(
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
       decoration: InputDecoration(
-        isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         suffixText: suffix,
         border: OutlineInputBorder(

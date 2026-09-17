@@ -362,17 +362,29 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get edit;
 
-  /// No description provided for @exportImage.
+  /// No description provided for @saveAsImage.
   ///
   /// In en, this message translates to:
-  /// **'Export Image'**
-  String get exportImage;
+  /// **'Save as image'**
+  String get saveAsImage;
 
-  /// No description provided for @exportPdf.
+  /// No description provided for @saveAsPdf.
   ///
   /// In en, this message translates to:
-  /// **'Export PDF'**
-  String get exportPdf;
+  /// **'Save as PDF'**
+  String get saveAsPdf;
+
+  /// No description provided for @shareAsImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Share as image'**
+  String get shareAsImage;
+
+  /// No description provided for @shareAsPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Share as PDF'**
+  String get shareAsPdf;
 
   /// No description provided for @invoiceTitle.
   ///
@@ -1219,6 +1231,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom sizes'**
   String get customSizesHint;
+
+  /// No description provided for @shareButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareButton;
+
+  /// No description provided for @invoiceSavedToGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice saved to gallery'**
+  String get invoiceSavedToGallery;
+
+  /// No description provided for @invoiceSavedToDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice saved to Documents'**
+  String get invoiceSavedToDocuments;
+
+  /// No description provided for @invoiceShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice shared'**
+  String get invoiceShared;
+
+  /// Settings section header for backup and restore
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupSectionTitle;
+
+  /// Button that saves a database backup to the backup folder
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get backupNow;
+
+  /// Button that picks a backup file and restores it
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from backup'**
+  String get backupRestore;
+
+  /// Status shown while a backup is being created
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up…'**
+  String get backupInProgress;
+
+  /// Status shown while a backup is being restored
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring…'**
+  String get backupRestoreInProgress;
+
+  /// No description provided for @backupLastAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Last auto-backup: {time}'**
+  String backupLastAuto(String time);
+
+  /// Toast after the backup share sheet completes
+  ///
+  /// In en, this message translates to:
+  /// **'Backup ready — save it from the share sheet.'**
+  String get backupShared;
+
+  /// No description provided for @backupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup failed: {error}'**
+  String backupFailed(String error);
+
+  /// No description provided for @restoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed: {error}'**
+  String restoreFailed(String error);
+
+  /// Title of the restore confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Replace local data?'**
+  String get restoreConfirmTitle;
+
+  /// No description provided for @restoreConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will replace everything on this device with the backup file. {count} unsynced change(s) will be lost.'**
+  String restoreConfirmMessage(int count);
+
+  /// Toast after a backup is restored successfully
+  ///
+  /// In en, this message translates to:
+  /// **'Backup restored.'**
+  String get restoreSuccess;
+
+  /// Label for the auto-backup cadence picker
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-backup'**
+  String get backupInterval;
+
+  /// Auto-backup cadence option: disabled
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get backupIntervalOff;
+
+  /// Auto-backup cadence option
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get backupIntervalDaily;
+
+  /// Auto-backup cadence option
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get backupIntervalWeekly;
+
+  /// Auto-backup cadence option
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get backupIntervalMonthly;
+
+  /// Label for the default manual-backup folder
+  ///
+  /// In en, this message translates to:
+  /// **'Backup folder'**
+  String get backupLocation;
+
+  /// Shown when no default backup folder is set
+  ///
+  /// In en, this message translates to:
+  /// **'Not set — ask every time'**
+  String get backupNoLocation;
+
+  /// Button that opens the backup folder picker
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get backupPickFolder;
+
+  /// Button that clears the default backup folder
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get backupClearFolder;
+
+  /// Toast after a manual backup is saved
+  ///
+  /// In en, this message translates to:
+  /// **'Backup saved to {path}'**
+  String backupSaved(String path);
+
+  /// Settings tab: language and general options
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get settingsTabGeneral;
+
+  /// Settings tab: sign-in and invites
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsTabAccount;
+
+  /// Settings tab: sync status
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get settingsTabSync;
 }
 
 class _AppLocalizationsDelegate

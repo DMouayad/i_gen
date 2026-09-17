@@ -1,5 +1,9 @@
 # AGENTS.md — i_gen working standards
 
+## Layout
+
+- **The Flutter app lives in `mobile/`.** Run `flutter` commands with workdir `mobile/`; app paths below are relative to it (`mobile/lib/…`). Repo-level dirs (`specs/`, `supabase/`) stay at root.
+
 ## Workflow
 
 - **Permission first.** No destructive or mutating operations without an explicit user go-ahead: no `git commit`/`push`/`amend`, no history rewrites, no `flutter pub upgrade` beyond what was approved, no deleting files outside the approved scope.
@@ -8,13 +12,15 @@
 
 ## Architecture invariants (offline-first + Supabase sync)
 
-- **Source of truth for sync schema/constants is `DbConstants` (`lib/db.dart`).** No mirror contract classes. If two files define the same table/column names, delete one.
-- **One-direction dependency: engine/UI → repos.** Repositories never import `lib/sync/*` or `lib/auth/*`. They enqueue via `SyncMetadata`/`SyncTrigger` only.
+- **Source of truth for sync schema/constants is `DbConstants` (`mobile/lib/db.dart`).** No mirror contract classes. If two files define the same table/column names, delete one.
+- **One-direction dependency: engine/UI → repos.** Repositories never import `mobile/lib/sync/*` or `mobile/lib/auth/*`. They enqueue via `SyncMetadata`/`SyncTrigger` only.
 - **Local integer PKs stay; `remote_id` is the shared identity.** Never change a `_id` on conflict paths (`REPLACE` is banned on synced tables — it orphans `remote_id`s). Update-in-place, preserve ids.
 - **Deletes are soft (`is_deleted=1` + outbox `delete` op).** Hard delete happens only after server ack (engine) or 30-day tombstone purge (maintenance). No hard deletes from UI paths.
 - **Outbox ops are idempotent by `op_id`.** `client_op_id` is UNIQUE server-side; retries must never duplicate.
 - **Checkpoints advance only over merged rows.** Skipped rows are counted, logged, and retried — never silently dropped, never wedging the cursor.
 - **Login is optional, never blocking.** The app works fully offline and logged out. Logout clears session only, never business data.
+- **Server schema and app ship together.** Never push a column the server lacks: unknown-column pushes fail and the op parks (5-strike rule), so run the `supabase/schema.sql` alters before releasing the app version that writes the column. Same for restore: a restored backup replays its outbox, which must match the live server schema.
+- **Backup/restore is file-level.** Whole-`.db` copy via `BackupService` (`mobile/lib/repos/backup_service.dart`); post-restore always close → swap → reopen via `DbProvider.open` → re-seat GetIt → `syncNow()`. One `pre-restore` fallback is kept, validation runs before any swap.
 
 ## What we don't do
 

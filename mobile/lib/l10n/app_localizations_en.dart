@@ -148,10 +148,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get edit => 'Edit';
 
   @override
-  String get exportImage => 'Export Image';
+  String get saveAsImage => 'Save as image';
 
   @override
-  String get exportPdf => 'Export PDF';
+  String get saveAsPdf => 'Save as PDF';
+
+  @override
+  String get shareAsImage => 'Share as image';
+
+  @override
+  String get shareAsPdf => 'Share as PDF';
 
   @override
   String get invoiceTitle => 'INVOICE';
@@ -652,4 +658,101 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customSizesHint => 'Custom sizes';
+
+  @override
+  String get shareButton => 'Share';
+
+  @override
+  String get invoiceSavedToGallery => 'Invoice saved to gallery';
+
+  @override
+  String get invoiceSavedToDocuments => 'Invoice saved to Documents';
+
+  @override
+  String get invoiceShared => 'Invoice shared';
+
+  @override
+  String get backupSectionTitle => 'Backup';
+
+  @override
+  String get backupNow => 'Back up now';
+
+  @override
+  String get backupRestore => 'Restore from backup';
+
+  @override
+  String get backupInProgress => 'Backing up…';
+
+  @override
+  String get backupRestoreInProgress => 'Restoring…';
+
+  @override
+  String backupLastAuto(String time) {
+    return 'Last auto-backup: $time';
+  }
+
+  @override
+  String get backupShared => 'Backup ready — save it from the share sheet.';
+
+  @override
+  String backupFailed(String error) {
+    return 'Backup failed: $error';
+  }
+
+  @override
+  String restoreFailed(String error) {
+    return 'Restore failed: $error';
+  }
+
+  @override
+  String get restoreConfirmTitle => 'Replace local data?';
+
+  @override
+  String restoreConfirmMessage(int count) {
+    return 'This will replace everything on this device with the backup file. $count unsynced change(s) will be lost.';
+  }
+
+  @override
+  String get restoreSuccess => 'Backup restored.';
+
+  @override
+  String get backupInterval => 'Auto-backup';
+
+  @override
+  String get backupIntervalOff => 'Off';
+
+  @override
+  String get backupIntervalDaily => 'Daily';
+
+  @override
+  String get backupIntervalWeekly => 'Weekly';
+
+  @override
+  String get backupIntervalMonthly => 'Monthly';
+
+  @override
+  String get backupLocation => 'Backup folder';
+
+  @override
+  String get backupNoLocation => 'Not set — ask every time';
+
+  @override
+  String get backupPickFolder => 'Choose';
+
+  @override
+  String get backupClearFolder => 'Clear';
+
+  @override
+  String backupSaved(String path) {
+    return 'Backup saved to $path';
+  }
+
+  @override
+  String get settingsTabGeneral => 'General';
+
+  @override
+  String get settingsTabAccount => 'Account';
+
+  @override
+  String get settingsTabSync => 'Sync';
 }

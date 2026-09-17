@@ -55,8 +55,10 @@
 
     "save": "حفظ",
     "edit": "تعديل",
-    "exportImage": "تصدير كصورة",
-    "exportPdf": "تصدير كـ PDF",
+    "saveAsImage": "حفظ كصورة",
+    "saveAsPdf": "حفظ كـ PDF",
+    "shareAsImage": "مشاركة كصورة",
+    "shareAsPdf": "مشاركة كـ PDF",
     "invoiceTitle": "فاتورة",
 
     "ordersNeedSyncConfig": "الطلبات بحاجة لإعداد المزامنة — يعمل التطبيق دون اتصال.",
@@ -323,5 +325,71 @@
     "upToDateStatus": "محدّث",
     "neverSynced": "أبداً",
     "sizesColumn": "المقاسات",
-    "customSizesHint": "مقاسات مخصصة"
+    "customSizesHint": "مقاسات مخصصة",
+    "shareButton": "مشاركة",
+    "invoiceSavedToGallery": "تم حفظ الفاتورة في المعرض",
+    "invoiceSavedToDocuments": "تم حفظ الفاتورة في المستندات",
+    "invoiceShared": "تمت مشاركة الفاتورة",
+
+    "backupSectionTitle": "النسخ الاحتياطي",
+    "@backupSectionTitle": { "description": "Settings section header for backup and restore" },
+    "backupNow": "نسخ احتياطي الآن",
+    "@backupNow": { "description": "Button that saves a database backup to the backup folder" },
+    "backupRestore": "استعادة من نسخة",
+    "@backupRestore": { "description": "Button that picks a backup file and restores it" },
+    "backupInProgress": "جارٍ النسخ الاحتياطي…",
+    "@backupInProgress": { "description": "Status shown while a backup is being created" },
+    "backupRestoreInProgress": "جارٍ الاستعادة…",
+    "@backupRestoreInProgress": { "description": "Status shown while a backup is being restored" },
+    "backupLastAuto": "آخر نسخة تلقائية: {time}",
+    "@backupLastAuto": {
+        "placeholders": { "time": { "type": "String" } }
+    },
+    "backupShared": "النسخة جاهزة — احفظها من نافذة المشاركة.",
+    "@backupShared": { "description": "Toast after the backup share sheet completes" },
+    "backupFailed": "فشل النسخ الاحتياطي: {error}",
+    "@backupFailed": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "restoreFailed": "فشلت الاستعادة: {error}",
+    "@restoreFailed": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "restoreConfirmTitle": "استبدال البيانات المحلية؟",
+    "@restoreConfirmTitle": { "description": "Title of the restore confirmation dialog" },
+    "restoreConfirmMessage": "سيؤدي هذا إلى استبدال كل البيانات على هذا الجهاز بملف النسخة الاحتياطية. سيتم فقدان {count} من التغييرات غير المُزامَنة.",
+    "@restoreConfirmMessage": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "restoreSuccess": "تمت استعادة النسخة الاحتياطية.",
+    "@restoreSuccess": { "description": "Toast after a backup is restored successfully" },
+    "backupInterval": "نسخ احتياطي تلقائي",
+    "@backupInterval": { "description": "Label for the auto-backup cadence picker" },
+    "backupIntervalOff": "متوقف",
+    "@backupIntervalOff": { "description": "Auto-backup cadence option: disabled" },
+    "backupIntervalDaily": "يومي",
+    "@backupIntervalDaily": { "description": "Auto-backup cadence option" },
+    "backupIntervalWeekly": "أسبوعي",
+    "@backupIntervalWeekly": { "description": "Auto-backup cadence option" },
+    "backupIntervalMonthly": "شهري",
+    "@backupIntervalMonthly": { "description": "Auto-backup cadence option" },
+    "backupLocation": "مجلد النسخ الاحتياطي",
+    "@backupLocation": { "description": "Label for the default manual-backup folder" },
+    "backupNoLocation": "غير محدد — يُسأل في كل مرة",
+    "@backupNoLocation": { "description": "Shown when no default backup folder is set" },
+    "backupPickFolder": "اختيار",
+    "@backupPickFolder": { "description": "Button that opens the backup folder picker" },
+    "backupClearFolder": "إزالة",
+    "@backupClearFolder": { "description": "Button that clears the default backup folder" },
+    "backupSaved": "تم حفظ النسخة الاحتياطية في {path}",
+    "@backupSaved": {
+        "description": "Toast after a manual backup is saved",
+        "placeholders": { "path": { "type": "String" } }
+    },
+    "settingsTabGeneral": "عام",
+    "@settingsTabGeneral": { "description": "Settings tab: language and general options" },
+    "settingsTabAccount": "الحساب",
+    "@settingsTabAccount": { "description": "Settings tab: sign-in and invites" },
+    "settingsTabSync": "المزامنة",
+    "@settingsTabSync": { "description": "Settings tab: sync status" }
 }

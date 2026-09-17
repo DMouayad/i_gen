@@ -1,10 +1,18 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:i_gen/auth/auth_exceptions.dart';
 import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/auth/invite_service.dart';
+import 'package:i_gen/repos/backup_service.dart';
 import 'package:i_gen/screens/invite_accept_screen.dart';
 import 'package:i_gen/sync/sync_bootstrap.dart';
+import 'package:i_gen/utils/backup_flow.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/locale_controller.dart';
 import 'package:i_gen/widgets/sync_status_card.dart';
@@ -20,116 +28,69 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.navSettings)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppGaps.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SectionLabel(
-              context.l10n.navSettings == 'Settings' ? 'ACCOUNT' : 'الحساب',
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(context.l10n.navSettings),
+          actions: [
+            // Locale lives here now (was the General tab): one tap toggles
+            // ar/en via LocaleController; MaterialApp rebuilds on notify.
+            IconButton(
+              tooltip: Localizations.localeOf(context).languageCode == 'ar'
+                  ? 'English'
+                  : 'العربية',
+              icon: const Icon(Icons.language_outlined),
+              onPressed: () => LocaleController.instance.toggle(),
             ),
-            const SizedBox(height: AppGaps.sm),
-            const _AuthCard(),
-            const SizedBox(height: AppGaps.xl),
-            _LanguageSection(),
-            const SizedBox(height: AppGaps.xl),
-            const _InviteCard(),
-            if (kSyncStagingGatePassed) ...[
-              const SizedBox(height: AppGaps.xl),
-              _SectionLabel('SYNC'),
-              const SizedBox(height: AppGaps.sm),
-              const SyncStatusCard(),
-              const SizedBox(height: AppGaps.sm),
-              Text(
-                context.l10n.settingsOfflineFirstNote,
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ] else ...[
-              const SizedBox(height: AppGaps.xl),
-              Text(
-                context.l10n.settingsStagingNote,
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurfaceVariant,
-                ),
-              ),
+          ],
+          bottom: TabBar(
+            tabs: [
+              Tab(text: context.l10n.settingsTabAccount),
+              Tab(text: context.l10n.backupSectionTitle),
             ],
-          ],
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: context.textTheme.labelMedium?.copyWith(
-        color: context.colorScheme.onSurfaceVariant,
-        letterSpacing: 0.8,
-      ),
-    );
-  }
-}
-
-class _LanguageSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppGaps.md,
-          vertical: AppGaps.sm,
-        ),
-        child: Row(
+        body: TabBarView(
           children: [
-            Icon(
-              Icons.language_outlined,
-              color: context.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: AppGaps.sm),
-            Expanded(
-              child: Text(
-                Localizations.localeOf(context).languageCode == 'ar'
-                    ? 'اللغة'
-                    : 'Language',
-                style: context.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            _tab(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _AuthCard(),
+                  const SizedBox(height: AppGaps.xl),
+                  const _InviteCard(),
+                  if (kSyncStagingGatePassed) ...[
+                    const SizedBox(height: AppGaps.xl),
+                    const SyncStatusCard(),
+                    const SizedBox(height: AppGaps.sm),
+                    Text(
+                      context.l10n.settingsOfflineFirstNote,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: context.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            ValueListenableBuilder<Locale?>(
-              valueListenable: LocaleController.instance,
-              builder: (context, locale, _) {
-                final code =
-                    locale?.languageCode ??
-                    Localizations.localeOf(context).languageCode;
-                return SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'en', label: Text('English')),
-                    ButtonSegment(value: 'ar', label: Text('العربية')),
-                  ],
-                  selected: {code == 'ar' ? 'ar' : 'en'},
-                  onSelectionChanged: (s) async {
-                    await LocaleController.instance.setLocale(Locale(s.first));
-                  },
-                  showSelectedIcon: false,
-                );
-              },
+            _tab(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: const [_BackupCard()],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Shared tab padding: the old single-scroll body padded once at the top.
+  static Widget _tab(Widget child) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppGaps.md),
+      child: child,
     );
   }
 }
@@ -299,7 +260,6 @@ class _AuthCardState extends State<_AuthCard> {
       builder: (context, snapshot) {
         final user = snapshot.data ?? _auth.currentUser;
         if (user != null) {
-          final role = _auth.currentRole;
           return Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.card),
@@ -332,27 +292,6 @@ class _AuthCardState extends State<_AuthCard> {
                           user.email ?? context.l10n.signedInFallback,
                           style: context.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppGaps.sm,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: context.colorScheme.tertiaryContainer,
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.control,
-                            ),
-                          ),
-                          child: Text(
-                            role == null
-                                ? context.l10n.syncAccountNote
-                                : context.l10n.syncAccountRoleNote(role.name),
-                            style: context.textTheme.labelSmall?.copyWith(
-                              color: context.colorScheme.onTertiaryContainer,
-                            ),
                           ),
                         ),
                       ],
@@ -482,6 +421,314 @@ class _AuthCardState extends State<_AuthCard> {
 
 extension _Center on Widget {
   Widget center() => Center(child: this);
+}
+
+/// Manual backup (share sheet) + restore-from-file + auto-backup status.
+///
+/// Backup failures toast and never touch live data. Restore validates the
+/// picked file before anything is swapped; when the outbox holds unsynced
+/// changes the user confirms the replacement count first.
+class _BackupCard extends StatefulWidget {
+  const _BackupCard();
+
+  @override
+  State<_BackupCard> createState() => _BackupCardState();
+}
+
+enum _BackupOp { none, backingUp, restoring }
+
+class _BackupCardState extends State<_BackupCard> {
+  _BackupOp _op = _BackupOp.none;
+  DateTime? _lastAuto;
+  int _intervalDays = BackupService.defaultAutoIntervalDays;
+  String? _defaultDir;
+
+  bool get _busy => _op != _BackupOp.none;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  Future<void> _loadStatus() async {
+    try {
+      final service = await buildBackupService();
+      final prefs = await SharedPreferences.getInstance();
+      final at = await service.lastAutoBackupAt(prefs);
+      if (mounted) {
+        setState(() {
+          _lastAuto = at;
+          _intervalDays =
+              prefs.getInt(BackupService.autoIntervalDaysKey) ??
+              BackupService.defaultAutoIntervalDays;
+          _defaultDir = prefs.getString(BackupService.defaultDirKey);
+        });
+      }
+    } catch (e) {
+      debugPrint('Backup: status load skipped: $e');
+    }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  static String _message(Object e) => e is StateError ? e.message : '$e';
+
+  String _format(DateTime time) {
+    final code = Localizations.localeOf(context).languageCode;
+    return DateFormat.yMd(code).add_Hm().format(time.toLocal());
+  }
+
+  /// Saves a timestamped `.db` to the default folder (or a one-off folder
+  /// picked now when none is set), then toasts the path. No share sheet:
+  /// the folder IS the destination.
+  Future<void> _backupNow() async {
+    if (_busy) return;
+    setState(() => _op = _BackupOp.backingUp);
+    try {
+      final service = await buildBackupService();
+      final prefs = await SharedPreferences.getInstance();
+      final dir =
+          prefs.getString(BackupService.defaultDirKey) ??
+          await FilePicker.getDirectoryPath();
+      if (dir == null) return; // Picker cancelled.
+      final target = p.join(
+        dir,
+        'i_gen-backup-${BackupService.fileStamp()}.db',
+      );
+      await service.backupToFile(target);
+      await _loadStatus();
+      if (!mounted) return;
+      _toast(context.l10n.backupSaved(target));
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context.l10n.backupFailed(_message(e)));
+    } finally {
+      if (mounted) setState(() => _op = _BackupOp.none);
+    }
+  }
+
+  Future<void> _pickDefaultDir() async {
+    final dir = await FilePicker.getDirectoryPath();
+    if (dir == null) return; // Picker cancelled.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(BackupService.defaultDirKey, dir);
+    await _loadStatus();
+  }
+
+  Future<void> _clearDefaultDir() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(BackupService.defaultDirKey);
+    await _loadStatus();
+  }
+
+  Future<void> _setInterval(int? days) async {
+    if (days == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(BackupService.autoIntervalDaysKey, days);
+    await _loadStatus();
+  }
+
+  /// Picks a `.db` file, validates it before touching live data, confirms
+  /// the replacement when unsynced changes exist, then swaps + re-seats
+  /// the database and triggers a post-restore sync.
+  Future<void> _restore() async {
+    if (_busy) return;
+    final picked = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['db'],
+    );
+    final path = picked?.path;
+    if (path == null) return; // Picker cancelled.
+    if (!mounted) return;
+    try {
+      await BackupService.validateBackupFile(path);
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context.l10n.restoreFailed(_message(e)));
+      return;
+    }
+    int pending = 0;
+    try {
+      pending = await outboxPendingCount(GetIt.I.get<Database>());
+    } catch (e) {
+      debugPrint('Backup: outbox count skipped: $e');
+    }
+    if (!mounted) return;
+    if (pending > 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(context.l10n.restoreConfirmTitle),
+          content: Text(context.l10n.restoreConfirmMessage(pending)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(context.l10n.cancelButton),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(context.l10n.backupRestore),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    setState(() => _op = _BackupOp.restoring);
+    try {
+      await restoreDatabaseFromFile(path);
+      await _loadStatus();
+      if (!mounted) return;
+      _toast(context.l10n.restoreSuccess);
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context.l10n.restoreFailed(_message(e)));
+    } finally {
+      if (mounted) setState(() => _op = _BackupOp.none);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _lastAuto == null
+        ? context.l10n.backupLastAuto(context.l10n.neverSynced)
+        : context.l10n.backupLastAuto(_format(_lastAuto!));
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppGaps.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.backup_outlined, color: context.colorScheme.primary),
+                const SizedBox(width: AppGaps.sm),
+                Expanded(
+                  child: Text(
+                    context.l10n.backupSectionTitle,
+                    style: context.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppGaps.xs),
+            Text(
+              status,
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppGaps.md),
+            Row(
+              children: [
+                Expanded(child: Text(context.l10n.backupInterval)),
+                DropdownButton<int>(
+                  value: _intervalDays,
+                  items: [
+                    DropdownMenuItem(
+                      value: 0,
+                      child: Text(context.l10n.backupIntervalOff),
+                    ),
+                    DropdownMenuItem(
+                      value: 1,
+                      child: Text(context.l10n.backupIntervalDaily),
+                    ),
+                    DropdownMenuItem(
+                      value: 7,
+                      child: Text(context.l10n.backupIntervalWeekly),
+                    ),
+                    DropdownMenuItem(
+                      value: 30,
+                      child: Text(context.l10n.backupIntervalMonthly),
+                    ),
+                  ],
+                  onChanged: _busy ? null : _setInterval,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppGaps.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(context.l10n.backupLocation),
+                      Text(
+                        _defaultDir ?? context.l10n.backupNoLocation,
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : _pickDefaultDir,
+                  child: Text(context.l10n.backupPickFolder),
+                ),
+                if (_defaultDir != null)
+                  TextButton(
+                    onPressed: _busy ? null : _clearDefaultDir,
+                    child: Text(context.l10n.backupClearFolder),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppGaps.md),
+            if (_busy)
+              Row(
+                children: [
+                  const SizedBox(
+                    width: AppGaps.md,
+                    height: AppGaps.md,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: AppGaps.sm),
+                  Text(
+                    _op == _BackupOp.backingUp
+                        ? context.l10n.backupInProgress
+                        : context.l10n.backupRestoreInProgress,
+                    style: context.textTheme.bodyMedium,
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _backupNow,
+                      icon: const Icon(Icons.save_alt_outlined, size: 20),
+                      label: Text(context.l10n.backupNow),
+                    ),
+                  ),
+                  const SizedBox(width: AppGaps.sm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _restore,
+                      icon: const Icon(Icons.restore_outlined, size: 20),
+                      label: Text(context.l10n.backupRestore),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Admin-only invite/resend/recover surface. Hidden for every other role —

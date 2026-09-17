@@ -6,50 +6,73 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/numbers.dart';
 import 'package:i_gen/widgets/number_field.dart';
 
-/// Cart sheet: one row per line plus an optional footer (invoice discount +
-/// total; orders pass null). The row is the only stateful piece — it owns
-/// the qty/price text controllers, scoped to the leaf instead of a
-/// top-level list.
 Future<void> showCartSheet(
   BuildContext context, {
   required CartController cart,
   required bool showPrices,
   String Function(num)? formatNumber,
   String? currency,
-
-  /// Invoice discount + total; empty by default (orders pass nothing).
   Widget footer = const SizedBox.shrink(),
 }) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true, // tall carts stay below the status bar
     showDragHandle: true,
     builder: (context) => ListenableBuilder(
       listenable: cart,
       builder: (context, _) => Padding(
+        // Keyboard avoidance. viewInsetsOf (not MediaQuery.of) so the sheet
+        // rebuilds only when the keyboard moves, not on any resize.
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: AppGaps.sm),
-                children: [
-                  for (final line in cart.lines)
-                    _CartRow(
-                      key: ObjectKey(line),
-                      line: line,
-                      cart: cart,
-                      showPrices: showPrices,
-                      formatNumber: formatNumber,
-                      currency: currency,
-                    ),
-                ],
+            // The scrim hides the AppBar, so the sheet states its own count.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Text(
+                context.l10n.itemsCount(cart.itemCount),
+                style: context.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
+            if (cart.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 32,
+                ),
+                child: Text(
+                  'cartEmpty',
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    color: context.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: AppGaps.sm),
+                  children: [
+                    for (final line in cart.lines)
+                      _CartRow(
+                        key: ObjectKey(line),
+                        line: line,
+                        cart: cart,
+                        showPrices: showPrices,
+                        formatNumber: formatNumber,
+                        currency: currency,
+                      ),
+                  ],
+                ),
+              ),
             footer,
           ],
         ),
@@ -115,10 +138,16 @@ class _CartRowState extends State<_CartRow> {
     }
   }
 
+  void _unfocus() => FocusScope.of(context).unfocus();
+
+  // Steppers never delete: minus stops at 1. X is the only remover, so a
+  // clumsy tap can't destroy a line's size + hand-typed price.
   void _bumpQty(int delta) {
-    final next = ((parseCanonicalInt(_qty.text) ?? 0) + delta).clamp(0, 999999);
-    _qty.text = next == 0 ? '' : '$next';
-    widget.cart.setQty(widget.line, next); // 0 removes the line
+    final current = parseCanonicalInt(_qty.text) ?? 0;
+    if (delta < 0 && current <= 1) return;
+    final next = (current + delta).clamp(1, 999999);
+    _qty.text = '$next';
+    widget.cart.setQty(widget.line, next);
   }
 
   @override
@@ -143,7 +172,6 @@ class _CartRowState extends State<_CartRow> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (line.product.hasSizes) _buildSizeMenu(context),
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
                 onPressed: () => widget.cart.remove(line),
@@ -161,9 +189,11 @@ class _CartRowState extends State<_CartRow> {
               NumberField(
                 controller: _qty,
                 width: 64,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _unfocus(),
                 onChanged: (raw) {
                   final qty = parseCanonicalInt(raw);
-                  // The field never deletes: only steppers/X remove lines.
+                  // The field never deletes: only X removes lines.
                   if (qty == null || qty <= 0) return;
                   widget.cart.setQty(line, qty);
                 },
@@ -179,6 +209,8 @@ class _CartRowState extends State<_CartRow> {
                     controller: _price,
                     allowDecimal: true,
                     suffix: widget.currency,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _unfocus(),
                     onChanged: (raw) {
                       final price = parseCanonicalDecimal(raw);
                       if (price == null || price < 0) return;
@@ -187,38 +219,24 @@ class _CartRowState extends State<_CartRow> {
                   ),
                 ),
                 const SizedBox(width: AppGaps.sm),
-                Text(
-                  widget.formatNumber?.call(line.total) ?? '${line.total}',
-                  style: context.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                // Money never ellipsizes — scale down instead.
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Text(
+                      widget.formatNumber?.call(line.total) ?? '${line.total}',
+                      style: context.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
               ],
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSizeMenu(BuildContext context) {
-    return PopupMenuButton<String?>(
-      initialValue: widget.line.size,
-      onSelected: (s) => widget.cart.setSize(widget.line, s),
-      itemBuilder: (_) => [
-        for (final s in widget.line.product.sizes)
-          PopupMenuItem(value: s, child: Text(s)),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppGaps.sm),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(widget.line.size ?? ''),
-            const Icon(Icons.arrow_drop_down),
-          ],
-        ),
       ),
     );
   }

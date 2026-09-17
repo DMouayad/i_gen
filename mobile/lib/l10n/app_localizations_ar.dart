@@ -148,10 +148,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get edit => 'تعديل';
 
   @override
-  String get exportImage => 'تصدير كصورة';
+  String get saveAsImage => 'حفظ كصورة';
 
   @override
-  String get exportPdf => 'تصدير كـ PDF';
+  String get saveAsPdf => 'حفظ كـ PDF';
+
+  @override
+  String get shareAsImage => 'مشاركة كصورة';
+
+  @override
+  String get shareAsPdf => 'مشاركة كـ PDF';
 
   @override
   String get invoiceTitle => 'فاتورة';
@@ -649,4 +655,101 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get customSizesHint => 'مقاسات مخصصة';
+
+  @override
+  String get shareButton => 'مشاركة';
+
+  @override
+  String get invoiceSavedToGallery => 'تم حفظ الفاتورة في المعرض';
+
+  @override
+  String get invoiceSavedToDocuments => 'تم حفظ الفاتورة في المستندات';
+
+  @override
+  String get invoiceShared => 'تمت مشاركة الفاتورة';
+
+  @override
+  String get backupSectionTitle => 'النسخ الاحتياطي';
+
+  @override
+  String get backupNow => 'نسخ احتياطي الآن';
+
+  @override
+  String get backupRestore => 'استعادة من نسخة';
+
+  @override
+  String get backupInProgress => 'جارٍ النسخ الاحتياطي…';
+
+  @override
+  String get backupRestoreInProgress => 'جارٍ الاستعادة…';
+
+  @override
+  String backupLastAuto(String time) {
+    return 'آخر نسخة تلقائية: $time';
+  }
+
+  @override
+  String get backupShared => 'النسخة جاهزة — احفظها من نافذة المشاركة.';
+
+  @override
+  String backupFailed(String error) {
+    return 'فشل النسخ الاحتياطي: $error';
+  }
+
+  @override
+  String restoreFailed(String error) {
+    return 'فشلت الاستعادة: $error';
+  }
+
+  @override
+  String get restoreConfirmTitle => 'استبدال البيانات المحلية؟';
+
+  @override
+  String restoreConfirmMessage(int count) {
+    return 'سيؤدي هذا إلى استبدال كل البيانات على هذا الجهاز بملف النسخة الاحتياطية. سيتم فقدان $count من التغييرات غير المُزامَنة.';
+  }
+
+  @override
+  String get restoreSuccess => 'تمت استعادة النسخة الاحتياطية.';
+
+  @override
+  String get backupInterval => 'نسخ احتياطي تلقائي';
+
+  @override
+  String get backupIntervalOff => 'متوقف';
+
+  @override
+  String get backupIntervalDaily => 'يومي';
+
+  @override
+  String get backupIntervalWeekly => 'أسبوعي';
+
+  @override
+  String get backupIntervalMonthly => 'شهري';
+
+  @override
+  String get backupLocation => 'مجلد النسخ الاحتياطي';
+
+  @override
+  String get backupNoLocation => 'غير محدد — يُسأل في كل مرة';
+
+  @override
+  String get backupPickFolder => 'اختيار';
+
+  @override
+  String get backupClearFolder => 'إزالة';
+
+  @override
+  String backupSaved(String path) {
+    return 'تم حفظ النسخة الاحتياطية في $path';
+  }
+
+  @override
+  String get settingsTabGeneral => 'عام';
+
+  @override
+  String get settingsTabAccount => 'الحساب';
+
+  @override
+  String get settingsTabSync => 'المزامنة';
 }

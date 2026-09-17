@@ -55,8 +55,10 @@
 
     "save": "Save",
     "edit": "Edit",
-    "exportImage": "Export Image",
-    "exportPdf": "Export PDF",
+    "saveAsImage": "Save as image",
+    "saveAsPdf": "Save as PDF",
+    "shareAsImage": "Share as image",
+    "shareAsPdf": "Share as PDF",
     "invoiceTitle": "INVOICE",
 
     "ordersNeedSyncConfig": "Orders need sync configuration — the app works offline.",
@@ -323,5 +325,71 @@
     "upToDateStatus": "Up to date",
     "neverSynced": "Never",
     "sizesColumn": "Sizes",
-    "customSizesHint": "Custom sizes"
+    "customSizesHint": "Custom sizes",
+    "shareButton": "Share",
+    "invoiceSavedToGallery": "Invoice saved to gallery",
+    "invoiceSavedToDocuments": "Invoice saved to Documents",
+    "invoiceShared": "Invoice shared",
+
+    "backupSectionTitle": "Backup",
+    "@backupSectionTitle": { "description": "Settings section header for backup and restore" },
+    "backupNow": "Back up now",
+    "@backupNow": { "description": "Button that saves a database backup to the backup folder" },
+    "backupRestore": "Restore from backup",
+    "@backupRestore": { "description": "Button that picks a backup file and restores it" },
+    "backupInProgress": "Backing up…",
+    "@backupInProgress": { "description": "Status shown while a backup is being created" },
+    "backupRestoreInProgress": "Restoring…",
+    "@backupRestoreInProgress": { "description": "Status shown while a backup is being restored" },
+    "backupLastAuto": "Last auto-backup: {time}",
+    "@backupLastAuto": {
+        "placeholders": { "time": { "type": "String" } }
+    },
+    "backupShared": "Backup ready — save it from the share sheet.",
+    "@backupShared": { "description": "Toast after the backup share sheet completes" },
+    "backupFailed": "Backup failed: {error}",
+    "@backupFailed": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "restoreFailed": "Restore failed: {error}",
+    "@restoreFailed": {
+        "placeholders": { "error": { "type": "String" } }
+    },
+    "restoreConfirmTitle": "Replace local data?",
+    "@restoreConfirmTitle": { "description": "Title of the restore confirmation dialog" },
+    "restoreConfirmMessage": "This will replace everything on this device with the backup file. {count} unsynced change(s) will be lost.",
+    "@restoreConfirmMessage": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "restoreSuccess": "Backup restored.",
+    "@restoreSuccess": { "description": "Toast after a backup is restored successfully" },
+    "backupInterval": "Auto-backup",
+    "@backupInterval": { "description": "Label for the auto-backup cadence picker" },
+    "backupIntervalOff": "Off",
+    "@backupIntervalOff": { "description": "Auto-backup cadence option: disabled" },
+    "backupIntervalDaily": "Daily",
+    "@backupIntervalDaily": { "description": "Auto-backup cadence option" },
+    "backupIntervalWeekly": "Weekly",
+    "@backupIntervalWeekly": { "description": "Auto-backup cadence option" },
+    "backupIntervalMonthly": "Monthly",
+    "@backupIntervalMonthly": { "description": "Auto-backup cadence option" },
+    "backupLocation": "Backup folder",
+    "@backupLocation": { "description": "Label for the default manual-backup folder" },
+    "backupNoLocation": "Not set — ask every time",
+    "@backupNoLocation": { "description": "Shown when no default backup folder is set" },
+    "backupPickFolder": "Choose",
+    "@backupPickFolder": { "description": "Button that opens the backup folder picker" },
+    "backupClearFolder": "Clear",
+    "@backupClearFolder": { "description": "Button that clears the default backup folder" },
+    "backupSaved": "Backup saved to {path}",
+    "@backupSaved": {
+        "description": "Toast after a manual backup is saved",
+        "placeholders": { "path": { "type": "String" } }
+    },
+    "settingsTabGeneral": "General",
+    "@settingsTabGeneral": { "description": "Settings tab: language and general options" },
+    "settingsTabAccount": "Account",
+    "@settingsTabAccount": { "description": "Settings tab: sign-in and invites" },
+    "settingsTabSync": "Sync",
+    "@settingsTabSync": { "description": "Settings tab: sync status" }
 }

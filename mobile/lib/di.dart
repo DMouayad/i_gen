@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -15,11 +17,12 @@ import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/repos/product_repo.dart';
 import 'package:i_gen/repos/sync_maintenance.dart';
 import 'package:i_gen/sync/sync_bootstrap.dart';
+import 'package:i_gen/utils/backup_flow.dart';
 
 Future<void> injectDependencies() async {
   // open DB connection
   final dbDir = await getApplicationSupportDirectory();
-  final dbPath = p.join(dbDir.path, 'i_gen.db');
+  final dbPath = p.join(dbDir.path, DbProvider.dbFileName);
 
   final db = await DbProvider.open(dbPath);
   if (!GetIt.I.isRegistered<Database>()) {
@@ -72,4 +75,9 @@ Future<void> injectDependencies() async {
   await OrderWatcher.wire();
 
   await GetIt.I.allReady();
+
+  // Weekly auto-backup. Fire-and-forget by design: a backup failure must
+  // never block launch — failures degrade to a log line inside
+  // [scheduleAutoBackup].
+  unawaited(scheduleAutoBackup());
 }

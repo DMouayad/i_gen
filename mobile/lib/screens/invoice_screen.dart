@@ -9,6 +9,7 @@ import 'package:gal/gal.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/models/invoice.dart';
@@ -16,6 +17,9 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/invoice_screen/invoice_customer_info.dart';
 import 'package:i_gen/widgets/invoice_table.dart';
 import 'package:i_gen/widgets/prevent_pop.dart';
+
+/// Save/share target for the preview popup menus.
+enum _ExportKind { image, pdf }
 
 class InvoiceDetails extends StatefulWidget {
   const InvoiceDetails({
@@ -61,10 +65,54 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
         '${widget.invoiceController.getDate()}';
   }
 
-  Future<void> saveAsImage() async {
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _runExport(Future<void> Function() op) async {
     setState(() => _isCapturing = true);
     await Future.delayed(const Duration(milliseconds: 100));
     try {
+      await op();
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context.l10n.unexpectedError(e.toString()));
+    } finally {
+      if (mounted) {
+        setState(() => _isCapturing = false);
+      }
+    }
+  }
+
+  Future<Uint8List> _buildPdfBytes() async {
+    final pngBytes = await _capturePng(5);
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: const PdfPageFormat(600, 700),
+        build: (pw.Context context) {
+          return pw.Center(child: pw.Image(pw.MemoryImage(pngBytes))); // Center
+        },
+      ),
+    );
+    return pdf.save();
+  }
+
+  Future<File> _writeTempFile(String name, Uint8List bytes) async {
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/$name');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
+  }
+
+  Future<void> _saveImage() {
+    // Captured before the awaits: context may be gone when they complete.
+    final l10n = context.l10n;
+    return _runExport(() async {
       if (_isDesktopPlatform) {
         final directory = await getApplicationDocumentsDirectory();
         final file = await File(
@@ -72,6 +120,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
         ).create();
 
         await file.writeAsBytes(await _capturePng());
+        _toast(l10n.invoiceSavedToDocuments);
       } else if (_isMobilePlatform) {
         final bool hasAccess = await Gal.hasAccess().then((hasAccess) {
           if (!hasAccess) {
@@ -80,47 +129,97 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
           return true;
         });
         if (hasAccess) {
-          Gal.putImageBytes(
+          await Gal.putImageBytes(
             await _capturePng(),
             album: 'Invoices',
             name: _getInvoiceFileName(),
           );
+          _toast(l10n.invoiceSavedToGallery);
         }
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isCapturing = false);
-      }
-    }
+    });
   }
 
-  Future<void> saveAsPdf() async {
-    setState(() => _isCapturing = true);
-    await Future.delayed(const Duration(milliseconds: 100));
-    try {
-      final pngBytes = await _capturePng(5);
-      final pdf = pw.Document();
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: const PdfPageFormat(600, 700),
-          build: (pw.Context context) {
-            return pw.Center(
-              child: pw.Image(pw.MemoryImage(pngBytes)),
-            ); // Center
-          },
-        ),
-      );
-
+  Future<void> _savePdf() {
+    final l10n = context.l10n;
+    return _runExport(() async {
       final directory = await getApplicationDocumentsDirectory();
       final file = await File(
         '${directory.path}/${_getInvoiceFileName()}.pdf',
       ).create();
-      await file.writeAsBytes(await pdf.save());
-    } finally {
-      if (mounted) {
-        setState(() => _isCapturing = false);
-      }
+      await file.writeAsBytes(await _buildPdfBytes());
+      _toast(l10n.invoiceSavedToDocuments);
+    });
+  }
+
+  Future<void> _shareFile(File file, String mimeType) async {
+    final l10n = context.l10n;
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: mimeType)],
+        text: _getInvoiceFileName(),
+      ),
+    );
+    if (result.status == ShareResultStatus.success) {
+      _toast(l10n.invoiceShared);
+    }
+  }
+
+  Future<void> _shareImage() => _runExport(() async {
+    final file = await _writeTempFile(
+      '${_getInvoiceFileName()}.png',
+      await _capturePng(),
+    );
+    await _shareFile(file, 'image/png');
+  });
+
+  Future<void> _sharePdf() => _runExport(() async {
+    final file = await _writeTempFile(
+      '${_getInvoiceFileName()}.pdf',
+      await _buildPdfBytes(),
+    );
+    await _shareFile(file, 'application/pdf');
+  });
+
+  /// Opens the image/PDF menu anchored under [buttonContext] and runs
+  /// [onSelected]. A real button + [showMenu] instead of nesting a button
+  /// inside a PopupMenuButton (the inner button would swallow the tap that
+  /// opens the menu).
+  Future<void> _selectExport(
+    BuildContext buttonContext, {
+    required String imageLabel,
+    required String pdfLabel,
+    required Future<void> Function(_ExportKind kind) onSelected,
+  }) async {
+    final box = buttonContext.findRenderObject()! as RenderBox;
+    final anchor = box.localToGlobal(Offset.zero);
+    final kind = await showMenu<_ExportKind>(
+      context: buttonContext,
+      position: RelativeRect.fromLTRB(
+        anchor.dx,
+        anchor.dy + box.size.height,
+        anchor.dx + box.size.width,
+        anchor.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: _ExportKind.image,
+          child: ListTile(
+            leading: const Icon(Icons.image),
+            title: Text(imageLabel),
+          ),
+        ),
+        PopupMenuItem(
+          value: _ExportKind.pdf,
+          child: ListTile(
+            leading: const Icon(Icons.file_open_rounded),
+            title: Text(pdfLabel),
+          ),
+        ),
+      ],
+    );
+    if (kind != null && mounted) {
+      await onSelected(kind);
     }
   }
 
@@ -157,7 +256,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                 const SizedBox(height: AppGaps.sm),
                 // Desktop keeps the table editor (mobile uses the grid).
                 InvoiceTable(widget.invoiceController),
-                SizedBox(height: AppGaps.xl + AppGaps.md),
+                const SizedBox(height: AppGaps.xl + AppGaps.md),
               ],
             ),
           ),
@@ -199,7 +298,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                       ),
                     ),
                     secondChild: Row(
-                      spacing: context.isMobile ? 0 : AppGaps.xs,
+                      spacing: AppGaps.sm,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         if (!context.isMobile)
@@ -211,17 +310,41 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                             icon: const Icon(Icons.edit),
                             style: filledBtnStyle,
                           ),
-                        TextButton.icon(
-                          onPressed: saveAsImage,
-                          label: Text(context.l10n.exportImage),
-                          icon: const Icon(Icons.image),
-                          style: filledBtnStyle,
+                        Builder(
+                          builder: (buttonContext) => OutlinedButton(
+                            onPressed: () => _selectExport(
+                              buttonContext,
+                              imageLabel: context.l10n.saveAsImage,
+                              pdfLabel: context.l10n.saveAsPdf,
+                              onSelected: (kind) {
+                                switch (kind) {
+                                  case _ExportKind.image:
+                                    return _saveImage();
+                                  case _ExportKind.pdf:
+                                    return _savePdf();
+                                }
+                              },
+                            ),
+                            child: Text(context.l10n.save),
+                          ),
                         ),
-                        TextButton.icon(
-                          onPressed: saveAsPdf,
-                          label: Text(context.l10n.exportPdf),
-                          icon: const Icon(Icons.file_open_rounded),
-                          style: filledBtnStyle,
+                        Builder(
+                          builder: (buttonContext) => OutlinedButton(
+                            onPressed: () => _selectExport(
+                              buttonContext,
+                              imageLabel: context.l10n.shareAsImage,
+                              pdfLabel: context.l10n.shareAsPdf,
+                              onSelected: (kind) {
+                                switch (kind) {
+                                  case _ExportKind.image:
+                                    return _shareImage();
+                                  case _ExportKind.pdf:
+                                    return _sharePdf();
+                                }
+                              },
+                            ),
+                            child: Text(context.l10n.shareButton),
+                          ),
                         ),
                       ],
                     ),

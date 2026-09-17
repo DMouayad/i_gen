@@ -147,6 +147,11 @@ class DbConstants {
 class DbProvider {
   static const int dbVersion = 4;
 
+  /// Name of the live sqlite file. Single source of truth — `injectDependencies`
+  /// (`mobile/lib/di.dart`) and the backup flow (`mobile/lib/utils/backup_flow.dart`) both
+  /// build the absolute path from this.
+  static const String dbFileName = 'i_gen.db';
+
   static Future<Database> open(String path) async {
     return await openDatabase(
       path,
