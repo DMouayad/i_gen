@@ -3,6 +3,14 @@
 ## Layout
 
 - **The Flutter app lives in `mobile/`.** Run `flutter` commands with workdir `mobile/`; app paths below are relative to it (`mobile/lib/…`). Repo-level dirs (`specs/`, `supabase/`) stay at root.
+- **The distributor web app lives in `web/`** (Next.js 16, Vercel root = `web/`). Run `pnpm` commands with workdir `web/`. Same Supabase project as mobile; `supabase/schema.sql` is the shared server contract for both.
+
+## Web workflow
+
+- **Toolchain:** pnpm via corepack (version resolves per-directory from `web/package.json` `packageManager`, currently 12.4.1 — keep the pin). Registry is slow here; prefer `--prefer-offline`, and approve new build scripts with `pnpm approve-builds <pkg>` (non-interactive) instead of fighting the gate.
+- **Verify everything (web):** after any web change run `pnpm exec tsc --noEmit` (0 errors) + `pnpm exec eslint` (0 errors, 0 warnings) + `pnpm build`. No live Supabase needed: pages degrade to the config notice without env vars.
+- **Scope:** distributor-only (catalog + cart + own orders). No prices surface anywhere (distributors order blind, `price: 0`); no admin/employee screens. Bilingual EN/AR via `web/lib/i18n.tsx` (hand-rolled dict — no next-intl). Client components + supabase-js browser client only: no `middleware.ts`/SSR auth (avoids the Next 16 proxy migration entirely).
+- **Server changes ship with both apps:** any column/policy the web writes must already exist live — add to `supabase/schema.sql` AND the commented live-upgrade block at its bottom, and run the block on the live project before deploying web.
 
 ## Workflow
 

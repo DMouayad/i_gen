@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #6b7280;
+  --card: #f9fafb;
+  --border: #e5e7eb;
+  --accent: #1d4ed8;
+  --accent-fg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --muted: #9ca3af;
+    --card: #171717;
+    --border: #262626;
+    --accent: #3b82f6;
+    --accent-fg: #ffffff;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    system-ui, "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 9999px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+.badge-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.badge-confirmed {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+.badge-delivered {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.badge-cancelled {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: #d1d5db;
+}
+@media (prefers-color-scheme: dark) {
+  .badge-pending {
+    background: #451a03;
+    color: #fcd34d;
+  }
+  .badge-confirmed {
+    background: #172554;
+    color: #93c5fd;
+  }
+  .badge-delivered {
+    background: #022c22;
+    color: #6ee7b7;
+  }
+  .badge-cancelled {
+    background: #1f2937;
+    color: #9ca3af;
+  }
+}

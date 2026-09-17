@@ -5,14 +5,16 @@
 -- scratch in final-state form. Identity for sync is Supabase Auth
 -- (auth.users / auth.uid()); the auth users themselves are never touched.
 --
--- Contents (final state of phases 0 + 6 + 8 + 10):
+-- Contents (final state of phases 0 + 6 + 8 + 10 + 12):
 --   5 business tables : products, price_categories, invoices,
 --                       invoice_lines, prices (offline-first sync domain)
 --   identity          : profiles (role/names/phone source of truth)
 --   orders domain     : orders, order_items (shared with the web app)
+--   web login         : phone_to_email(text) RPC (phone -> login email)
 --   role RLS          : admin full; employee RW invoices/lines + RO catalog
---                       and RO orders; distributor own-orders only, no
---                       access to the five business tables in this app.
+--                       and RO orders; distributor RO products (no prices)
+--                       + own-orders RW while pending, no access to the five
+--                       business tables in this app.
 --
 -- Dashboard prerequisites (no SQL, still required):
 --   1. Authentication -> Providers -> Email -> "Allow new users to sign up" = OFF.
@@ -36,6 +38,7 @@ DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP FUNCTION IF EXISTS public.is_staff() CASCADE;
 DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
 DROP FUNCTION IF EXISTS public.current_role() CASCADE;
+DROP FUNCTION IF EXISTS public.phone_to_email(text) CASCADE;
 DROP FUNCTION IF EXISTS public.handle_updated_at() CASCADE;
 
 -- ============================== setup ==============================
@@ -146,12 +149,15 @@ CREATE TABLE public.orders (
 );
 
 -- Child of orders (ON DELETE CASCADE); product link is non-cascading.
+-- `size` mirrors invoice_lines.size (`''` = sizeless) so distributors can
+-- order per-size quantities; the Flutter read model ignores the extra key.
 CREATE TABLE public.order_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id uuid NOT NULL REFERENCES public.orders (id) ON DELETE CASCADE,
   product_id uuid REFERENCES public.products (id),
   amount integer NOT NULL CHECK (amount > 0),
-  price double precision NOT NULL CHECK (price >= 0)
+  price double precision NOT NULL CHECK (price >= 0),
+  size text NOT NULL DEFAULT ''
 );
 
 CREATE INDEX idx_orders_distributor_created
@@ -223,6 +229,20 @@ AS $$
   SELECT coalesce(public.current_role() IN ('admin', 'employee'), false)
 $$;
 
+-- Phone login lookup (Phase 12): Supabase Auth is email+password, but the
+-- distributor's real-world key is the phone, so the login form resolves
+-- phone -> synthesized email BEFORE signing in. SECURITY DEFINER because
+-- anon callers cannot read profiles; returns NULL for unknown phones (the
+-- client shows "no account for this phone" — never an error dump).
+CREATE OR REPLACE FUNCTION public.phone_to_email(p_phone text)
+RETURNS text
+LANGUAGE sql STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT fake_email FROM public.profiles WHERE phone = p_phone LIMIT 1
+$$;
+
 -- ============================== RLS: profiles ==============================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
@@ -258,6 +278,14 @@ CREATE POLICY admin_update ON public.products
 DROP POLICY IF EXISTS admin_delete ON public.products;
 CREATE POLICY admin_delete ON public.products
   FOR DELETE USING (public.is_admin());
+
+-- Distributor web app (Phase 12): catalog is visible but read-only and hides
+-- soft-deleted rows. No prices table access — distributors order blind
+-- (order_items.price is written as 0, staff price later).
+DROP POLICY IF EXISTS products_distributor_read ON public.products;
+CREATE POLICY products_distributor_read ON public.products
+  FOR SELECT
+  USING (public.current_role() = 'distributor' AND is_deleted = false);
 
 -- price_categories: staff read, admin write
 DROP POLICY IF EXISTS company_read ON public.price_categories;
@@ -341,6 +369,17 @@ CREATE POLICY orders_distributor_own_insert ON public.orders
   FOR INSERT
   WITH CHECK (distributor_id = auth.uid());
 
+-- Distributor self-edit (Phase 12): own orders stay editable while pending
+-- (add/remove lines, change amounts, or cancel). USING pins the current row
+-- to pending so confirmed/delivered history is read-only; WITH CHECK pins
+-- the new row to own + pending/cancelled so a distributor can never confirm,
+-- deliver, or reassign their order.
+DROP POLICY IF EXISTS orders_distributor_own_update ON public.orders;
+CREATE POLICY orders_distributor_own_update ON public.orders
+  FOR UPDATE
+  USING (distributor_id = auth.uid() AND status = 'pending')
+  WITH CHECK (distributor_id = auth.uid() AND status IN ('pending', 'cancelled'));
+
 DROP POLICY IF EXISTS items_admin_all ON public.order_items;
 CREATE POLICY items_admin_all ON public.order_items
   FOR ALL
@@ -368,7 +407,44 @@ CREATE POLICY items_distributor_own_insert ON public.order_items
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.orders o
-      WHERE o.id = order_id AND o.distributor_id = auth.uid()
+      WHERE o.id = order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  );
+
+-- Line edits follow the parent order: writable only while the parent is the
+-- caller's own pending order (USING + WITH CHECK both gated, so lines can
+-- neither move to someone else's order nor outlive the pending window).
+DROP POLICY IF EXISTS items_distributor_own_update ON public.order_items;
+CREATE POLICY items_distributor_own_update ON public.order_items
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_items.order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  );
+
+DROP POLICY IF EXISTS items_distributor_own_delete ON public.order_items;
+CREATE POLICY items_distributor_own_delete ON public.order_items
+  FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_items.order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
     )
   );
 
@@ -385,6 +461,9 @@ GRANT ALL ON public.prices TO authenticated;
 GRANT ALL ON public.profiles TO authenticated;
 GRANT ALL ON public.orders TO authenticated;
 GRANT ALL ON public.order_items TO authenticated;
+
+-- Phone login lookup is callable pre-auth (anon) and post-auth.
+GRANT EXECUTE ON FUNCTION public.phone_to_email(text) TO anon, authenticated;
 
 -- The invite function acts with the service key (bypasses RLS but still
 -- needs table privileges on tables created after project provisioning).
@@ -440,5 +519,83 @@ ON CONFLICT (id) DO UPDATE SET
 --        (u.raw_app_meta_data ->> 'role') AS token_role
 -- FROM public.profiles p JOIN auth.users u ON u.id = p.id
 -- WHERE p.role = 'admin';
+*/
+
+-- ============================== live upgrade: distributor web (Phase 12) ==
+-- The file above is fresh-install. For a LIVE project that already ran an
+-- older schema.sql, run this block instead (idempotent: DROP IF EXISTS +
+-- CREATE OR REPLACE). It adds only the Phase 12 delta — no data is touched.
+/*
+DROP POLICY IF EXISTS products_distributor_read ON public.products;
+CREATE POLICY products_distributor_read ON public.products
+  FOR SELECT
+  USING (public.current_role() = 'distributor' AND is_deleted = false);
+
+DROP POLICY IF EXISTS orders_distributor_own_update ON public.orders;
+CREATE POLICY orders_distributor_own_update ON public.orders
+  FOR UPDATE
+  USING (distributor_id = auth.uid() AND status = 'pending')
+  WITH CHECK (distributor_id = auth.uid() AND status IN ('pending', 'cancelled'));
+
+DROP POLICY IF EXISTS items_distributor_own_insert ON public.order_items;
+CREATE POLICY items_distributor_own_insert ON public.order_items
+  FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  );
+
+DROP POLICY IF EXISTS items_distributor_own_update ON public.order_items;
+CREATE POLICY items_distributor_own_update ON public.order_items
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_items.order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  );
+
+DROP POLICY IF EXISTS items_distributor_own_delete ON public.order_items;
+CREATE POLICY items_distributor_own_delete ON public.order_items
+  FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.orders o
+      WHERE o.id = order_items.order_id
+        AND o.distributor_id = auth.uid()
+        AND o.status = 'pending'
+    )
+  );
+
+CREATE OR REPLACE FUNCTION public.phone_to_email(p_phone text)
+RETURNS text
+LANGUAGE sql STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT fake_email FROM public.profiles WHERE phone = p_phone LIMIT 1
+$$;
+GRANT EXECUTE ON FUNCTION public.phone_to_email(text) TO anon, authenticated;
+
+-- Verify (as a distributor login; expect own pending order editable):
+-- SELECT * FROM public.products LIMIT 1;              -- works (catalog read)
+-- SELECT * FROM public.prices LIMIT 1;                -- 0 rows (no access)
+-- SELECT public.phone_to_email('+963000000000');      -- admin's fake_email
+ALTER TABLE public.order_items
+  ADD COLUMN IF NOT EXISTS size text NOT NULL DEFAULT '';
 */
 
