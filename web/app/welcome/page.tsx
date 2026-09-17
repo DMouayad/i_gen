@@ -20,15 +20,34 @@ function WelcomeForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabaseConfigured() || !code) {
+    if (!supabaseConfigured()) {
       // Mount-time sync: invite-code validity resolves after mount.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase("expired");
       return;
     }
-    getSupabase()
-      .auth.exchangeCodeForSession(code)
-      .then(({ error }) => setPhase(error ? "expired" : "ready"));
+    void (async () => {
+      const sb = getSupabase();
+      // PKCE link (?code=…): redeem explicitly. A redeemed/expired code is
+      // not fatal — the same human may already hold a session from another
+      // tab, so fall through to the session check below.
+      if (code) {
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (!error) {
+          setPhase("ready");
+          return;
+        }
+      } else if (
+        typeof window !== "undefined" &&
+        window.location.hash.includes("access_token")
+      ) {
+        // Implicit link (#access_token=…): the client auto-detects it on
+        // init; allow a beat for the session to land before checking.
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      const { data } = await sb.auth.getSession();
+      setPhase(data.session ? "ready" : "expired");
+    })();
   }, [code]);
 
   if (!supabaseConfigured()) return <p className="muted">{t.missingConfig}</p>;
