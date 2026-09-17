@@ -646,4 +646,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get neverSynced => 'Never';
+
+  @override
+  String get sizesColumn => 'Sizes';
+
+  @override
+  String get customSizesHint => 'Custom sizes';
 }

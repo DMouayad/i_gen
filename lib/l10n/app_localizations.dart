@@ -1207,6 +1207,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Never'**
   String get neverSynced;
+
+  /// No description provided for @sizesColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sizes'**
+  String get sizesColumn;
+
+  /// No description provided for @customSizesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom sizes'**
+  String get customSizesHint;
 }
 
 class _AppLocalizationsDelegate

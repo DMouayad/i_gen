@@ -758,6 +758,18 @@ class SyncService {
           where: '${DbConstants.columnId} = ?',
           whereArgs: [twinId],
         );
+      } else if (twin[DbConstants.columnRemoteId] == null &&
+          twin[DbConstants.columnUpdatedAt] == DbConstants.seedUpdatedAt) {
+        // Pristine seed (bundled default, never user-edited, never synced):
+        // the server always wins content, even on tie or device-clock skew
+        // where the local stamp looks newer. (values already carries the
+        // pulled server id.)
+        await txn.update(
+          table,
+          values,
+          where: '${DbConstants.columnId} = ?',
+          whereArgs: [twinId],
+        );
       } else if (twin[DbConstants.columnRemoteId] == null) {
         // Older twin, but the local row was never synced: adopt the server
         // identity anyway (nothing depends on the local id yet) while

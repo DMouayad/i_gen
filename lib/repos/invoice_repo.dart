@@ -68,20 +68,22 @@ class InvoiceRepo {
         );
       }
 
-      // Match lines by product: update surviving rows in place (stable
-      // `_id` keeps `remote_id` matching), soft-delete removed ones, insert
-      // genuinely new ones. Never delete-all + reinsert: that churns `_id`s
-      // and orphans the server twins.
+      // Match lines by (product, size): update surviving rows in place
+      // (stable `_id` keeps `remote_id` matching), soft-delete removed ones,
+      // insert genuinely new ones. Never delete-all + reinsert: that churns
+      // `_id`s and orphans the server twins.
       final previousLines = await txn.query(
         DbConstants.tableInvoiceLine,
         where: '${DbConstants.columnInvoiceLineInvoiceId} = ?',
         whereArgs: [id],
       );
-      final previousByProduct = <int, Map<String, Object?>>{};
+      final previousByLine = <(int, String), Map<String, Object?>>{};
       for (final prev in previousLines) {
         final pid = prev[DbConstants.columnInvoiceLineProductId] as int?;
         if (pid != null) {
-          previousByProduct[pid] = Map<String, Object?>.from(prev);
+          // '' = sizeless (the column is NOT NULL DEFAULT '').
+          final size = prev[DbConstants.columnInvoiceLineSize] as String? ?? '';
+          previousByLine[(pid, size)] = Map<String, Object?>.from(prev);
         }
       }
       for (var line in lines) {
@@ -91,8 +93,11 @@ class InvoiceRepo {
               DbConstants.columnInvoiceLineProductId: line.product.id,
               DbConstants.columnInvoiceLineAmount: line.amount,
               DbConstants.columnInvoiceLinePrice: line.unitPrice,
+              DbConstants.columnInvoiceLineSize: InvoiceLine.encodeSize(
+                line.size,
+              ),
             });
-        final prev = previousByProduct.remove(line.product.id);
+        final prev = previousByLine.remove((line.product.id, line.size ?? ''));
         if (prev == null) {
           final lineId = await txn.insert(
             DbConstants.tableInvoiceLine,
@@ -124,7 +129,7 @@ class InvoiceRepo {
           );
         }
       }
-      for (final removed in previousByProduct.values) {
+      for (final removed in previousByLine.values) {
         final removedId = removed[DbConstants.columnId] as int;
         await SyncMetadata.softDelete(
           txn,
@@ -154,6 +159,7 @@ class InvoiceRepo {
                 price: l.unitPrice.toDouble(),
                 invoiceId: id!,
                 product: l.product,
+                size: l.size,
               ),
             )
             .toList(),
@@ -177,7 +183,7 @@ class InvoiceRepo {
       alias: DbConstants.tableInvoiceLine,
     );
     final result = await db.rawQuery('''
-select invoice.*, product_id, amount,price from invoice left join invoice_line on invoice._id = invoice_line.invoice_id
+select invoice.*, product_id, amount, price, ${DbConstants.tableInvoiceLine}.${DbConstants.columnInvoiceLineSize} as size from invoice left join invoice_line on invoice._id = invoice_line.invoice_id
 and ($lineFilter)
 where ($invoiceFilter)
 ${orderBy != null ? ' ORDER BY ${orderBy.field} ${orderBy.isAscending ? " asc" : " desc"}' : ''}
@@ -199,6 +205,7 @@ ${orderBy != null ? ' ORDER BY ${orderBy.field} ${orderBy.isAscending ? " asc" :
               product: _products.firstWhere(
                 (element) => element.id == productId,
               ),
+              size: InvoiceLine.decodeSize(row['size']),
             ),
           );
         }

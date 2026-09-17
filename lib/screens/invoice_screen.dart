@@ -16,7 +16,6 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/invoice_screen/invoice_customer_info.dart';
 import 'package:i_gen/widgets/invoice_table.dart';
 import 'package:i_gen/widgets/prevent_pop.dart';
-import 'package:i_gen/widgets/sync_spinner.dart';
 
 class InvoiceDetails extends StatefulWidget {
   const InvoiceDetails({
@@ -34,6 +33,13 @@ class InvoiceDetails extends StatefulWidget {
 class _InvoiceDetailsState extends State<InvoiceDetails> {
   GlobalKey globalKey = GlobalKey();
   bool _isCapturing = false;
+
+  Future<void> _save() async {
+    await widget.invoiceController.saveToDB();
+    if (widget.invoiceController.invoice != null) {
+      widget.onSaved?.call(widget.invoiceController.invoice!);
+    }
+  }
 
   Future<Uint8List> _capturePng([double pixelRation = 3.5]) async {
     await Future.delayed(const Duration(milliseconds: 100));
@@ -149,6 +155,7 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                 const SizedBox(height: AppGaps.sm),
                 InvoiceCustomerInfo(widget.invoiceController),
                 const SizedBox(height: AppGaps.sm),
+                // Desktop keeps the table editor (mobile uses the grid).
                 InvoiceTable(widget.invoiceController),
                 SizedBox(height: AppGaps.xl + AppGaps.md),
               ],
@@ -179,21 +186,13 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
           return Scaffold(
             appBar: AppBar(
               actions: [
-                const SyncSpinner(),
                 SizedBox(
                   width: context.width * .8,
                   child: AnimatedCrossFade(
                     firstChild: Container(
                       alignment: AlignmentDirectional.centerEnd,
                       child: FilledButton.icon(
-                        onPressed: () async {
-                          await widget.invoiceController.saveToDB();
-                          if (widget.invoiceController.invoice != null) {
-                            widget.onSaved?.call(
-                              widget.invoiceController.invoice!,
-                            );
-                          }
-                        },
+                        onPressed: _save,
                         label: Text(context.l10n.save),
                         icon: const Icon(Icons.save),
                         style: filledBtnStyle,
@@ -203,33 +202,6 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                       spacing: context.isMobile ? 0 : AppGaps.xs,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // if (!context.isMobile)
-                        //   ValueListenableBuilder(
-                        //     valueListenable:
-                        //         widget.invoiceController.textSizeNotifier,
-                        //     builder: (context, value, _) {
-                        //       return Row(
-                        //         children: [
-                        //           Text(
-                        //             "Text Size is ${value.floor()}",
-                        //             style: context.textTheme.titleMedium,
-                        //           ),
-                        //           Slider(
-                        //             min: 16,
-                        //             max: 28,
-                        //             value: value.toDouble(),
-                        //             onChanged: (value) {
-                        //               widget
-                        //                   .invoiceController
-                        //                   .textSizeNotifier
-                        //                   .value = value
-                        //                   .floor();
-                        //             },
-                        //           ),
-                        //         ],
-                        //       );
-                        //     },
-                        //   ),
                         if (!context.isMobile)
                           TextButton.icon(
                             onPressed: () {
@@ -261,6 +233,8 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
                 ),
               ],
             ),
+            // Editing uses the table on desktop and the grid on mobile;
+            // the paper above is preview/print only.
             body: Center(child: bodyContent),
           );
         },

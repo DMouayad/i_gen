@@ -38,6 +38,57 @@ void main() {
     await db.close();
   });
 
+  test('v1 -> v4 upgrade widens the line UNIQUE and backfills sizes', () async {
+    final v1 = await openV1Fixture();
+    final path = v1.path;
+    await v1.close();
+
+    final db = await reopenViaProvider(path);
+
+    // Pre-v4 lines become sizeless.
+    final lines = await db.query(DbConstants.tableInvoiceLine);
+    expect(lines, isNotEmpty);
+    for (final line in lines) {
+      expect(line[DbConstants.columnInvoiceLineSize], '');
+    }
+    // Same product in different sizes coexists now...
+    final first = lines.first;
+    await db.insert(DbConstants.tableInvoiceLine, {
+      DbConstants.columnInvoiceLineInvoiceId:
+          first[DbConstants.columnInvoiceLineInvoiceId],
+      DbConstants.columnInvoiceLineProductId:
+          first[DbConstants.columnInvoiceLineProductId],
+      DbConstants.columnInvoiceLineAmount: 1,
+      DbConstants.columnInvoiceLinePrice: 5.0,
+      DbConstants.columnInvoiceLineSize: 'M',
+      DbConstants.columnUpdatedAt: 1,
+      DbConstants.columnIsDeleted: 0,
+    });
+    // ...while the same product + same size still replaces (no dupes).
+    await db.insert(DbConstants.tableInvoiceLine, {
+      DbConstants.columnInvoiceLineInvoiceId:
+          first[DbConstants.columnInvoiceLineInvoiceId],
+      DbConstants.columnInvoiceLineProductId:
+          first[DbConstants.columnInvoiceLineProductId],
+      DbConstants.columnInvoiceLineAmount: 9,
+      DbConstants.columnInvoiceLinePrice: 5.0,
+      DbConstants.columnInvoiceLineSize: '',
+      DbConstants.columnUpdatedAt: 1,
+      DbConstants.columnIsDeleted: 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    final invoiceId = first[DbConstants.columnInvoiceLineInvoiceId];
+    final productId = first[DbConstants.columnInvoiceLineProductId];
+    final kept = await db.query(
+      DbConstants.tableInvoiceLine,
+      where:
+          '${DbConstants.columnInvoiceLineInvoiceId} = ? '
+          'AND ${DbConstants.columnInvoiceLineProductId} = ?',
+      whereArgs: [invoiceId, productId],
+    );
+    expect(kept, hasLength(2));
+    await db.close();
+  });
+
   test('fresh-install schema equals upgraded schema', () async {
     final v1 = await openV1Fixture();
     final path = v1.path;

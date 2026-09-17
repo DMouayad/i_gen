@@ -11,7 +11,13 @@ class ProductRepo {
   /// Inserts a product, or updates the existing row when [model] already
   /// exists. Update-in-place keeps a stable `_id` — `REPLACE` is banned on
   /// synced tables (it deletes + reinserts, orphaning `remote_id` matches).
-  Future<Product> insertProduct({String? model, String? name}) async {
+  /// [sizes] are stored sorted ([Product.sortSizes]) as a JSON array.
+  Future<Product> insertProduct({
+    String? model,
+    String? name,
+    List<String> sizes = const [],
+  }) async {
+    final encodedSizes = Product.encodeSizes(sizes);
     return await db.transaction((txn) async {
       final existing = await txn.query(
         DbConstants.tableProduct,
@@ -26,6 +32,7 @@ class ProductRepo {
             await SyncMetadata.withStamp(txn, DbConstants.tableProduct, {
               DbConstants.columnProductModel: model,
               DbConstants.columnProductName: name,
+              DbConstants.columnProductSizes: encodedSizes,
             });
         await txn.update(
           DbConstants.tableProduct,
@@ -41,16 +48,19 @@ class ProductRepo {
             op: DbConstants.opUpdate,
           ),
         );
-        return Product(id: id, model: model!, name: name!);
+        return Product(
+          id: id,
+          model: model!,
+          name: name!,
+          sizes: Product.sortSizes(sizes),
+        );
       }
-      final values = await SyncMetadata.withStamp(
-        txn,
-        DbConstants.tableProduct,
-        {
-          DbConstants.columnProductModel: model,
-          DbConstants.columnProductName: name,
-        },
-      );
+      final values =
+          await SyncMetadata.withStamp(txn, DbConstants.tableProduct, {
+            DbConstants.columnProductModel: model,
+            DbConstants.columnProductName: name,
+            DbConstants.columnProductSizes: encodedSizes,
+          });
       final id = await txn.insert(DbConstants.tableProduct, values);
       await SyncMetadata.recordMutation(
         txn,
@@ -60,7 +70,12 @@ class ProductRepo {
           op: DbConstants.opInsert,
         ),
       );
-      return Product(id: id, model: model!, name: name!);
+      return Product(
+        id: id,
+        model: model!,
+        name: name!,
+        sizes: Product.sortSizes(sizes),
+      );
     });
   }
 
@@ -70,7 +85,7 @@ class ProductRepo {
       DbConstants.tableProduct,
     );
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT ${DbConstants.columnId} as id, ${DbConstants.columnProductModel} as model, ${DbConstants.columnProductName} as name
+      SELECT ${DbConstants.columnId} as id, ${DbConstants.columnProductModel} as model, ${DbConstants.columnProductName} as name, ${DbConstants.columnProductSizes} as sizes
       FROM ${DbConstants.tableProduct}
       WHERE $filter
       ''');
@@ -86,6 +101,7 @@ class ProductRepo {
           await SyncMetadata.withStamp(txn, DbConstants.tableProduct, {
             DbConstants.columnProductModel: product.model,
             DbConstants.columnProductName: product.name,
+            DbConstants.columnProductSizes: Product.encodeSizes(product.sizes),
           });
       final updatedCount = await txn.update(
         DbConstants.tableProduct,

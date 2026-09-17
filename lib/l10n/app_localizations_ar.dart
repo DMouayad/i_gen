@@ -643,4 +643,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get neverSynced => 'أبداً';
+
+  @override
+  String get sizesColumn => 'المقاسات';
+
+  @override
+  String get customSizesHint => 'مقاسات مخصصة';
 }

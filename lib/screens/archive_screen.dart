@@ -8,7 +8,7 @@ import 'package:i_gen/repos/sync_trigger.dart';
 import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
-import 'package:i_gen/widgets/sync_spinner.dart';
+import 'package:i_gen/widgets/sync_button.dart';
 import 'package:intl/intl.dart';
 
 class ArchiveScreen extends StatefulWidget {
@@ -108,7 +108,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                         handleOnSorted();
                       },
                     ),
-                    const SyncSpinner(),
+                    SyncButton(onSynced: _load),
                   ],
                 ),
               ),

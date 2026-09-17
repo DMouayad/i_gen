@@ -24,12 +24,22 @@ class DbConstants {
   static const String columnProductModel = 'model';
   static const String columnProductName = 'name';
 
+  /// JSON array of size labels (e.g. `["S","M","L"]`), `[]` when sizeless.
+  /// Sorted by `kSizeOrder` on write; unknown labels sort last.
+  static const String columnProductSizes = 'sizes';
+
   //
   static const String tableInvoiceLine = 'invoice_line';
   static const String columnInvoiceLineInvoiceId = 'invoice_id';
   static const String columnInvoiceLineProductId = 'product_id';
   static const String columnInvoiceLineAmount = 'amount';
   static const String columnInvoiceLinePrice = 'price';
+
+  /// Size label for a line (`''` = sizeless). NOT NULL with `''` default on
+  /// purpose: NULLs are distinct in a UNIQUE index, so nullable sizes would
+  /// let duplicate sizeless lines pile up instead of replacing. Models map
+  /// `''` ↔ null at the boundary ([InvoiceLine.encodeSize]/[decodeSize]).
+  static const String columnInvoiceLineSize = 'size';
 
   //
   static const String tableInvoice = 'invoice';
@@ -116,6 +126,15 @@ class DbConstants {
   static String seedOpId(String table, String naturalKey) =>
       'seed-$table-$naturalKey';
 
+  /// `updated_at` stamp for freshly seeded catalog rows. Epoch-old on
+  /// purpose: any server truth (millis-since-epoch) is strictly newer, so a
+  /// pull twin-merge overwrites pristine seed defaults instead of tying on
+  /// `now` and keeping the stale content. Real edits bump via `withStamp`
+  /// and the push ack writes the server timestamp back — only pristine,
+  /// never-pushed seeds carry this value, so it also marks "safe for the
+  /// server to win" in the twin merge.
+  static const int seedUpdatedAt = 1;
+
   /// True for best-effort catalog-seed ops (see [seedOpId]). Seed pushes are
   /// convergence hints, not user data: when the server refuses them the
   /// device heals via pull, so they must never park as errors.
@@ -126,7 +145,7 @@ class DbConstants {
 }
 
 class DbProvider {
-  static const int dbVersion = 2;
+  static const int dbVersion = 4;
 
   static Future<Database> open(String path) async {
     return await openDatabase(
@@ -135,10 +154,18 @@ class DbProvider {
       onCreate: (Database db, int version) async {
         await createV1Tables(db);
         await applyV2Migration(db);
+        await applyV3Migration(db);
+        await applyV4Migration(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
           await applyV2Migration(db);
+        }
+        if (oldVersion < 3) {
+          await applyV3Migration(db);
+        }
+        if (oldVersion < 4) {
+          await applyV4Migration(db);
         }
       },
     );
@@ -260,6 +287,78 @@ create table if not exists ${DbConstants.tableSyncState} (
   ${DbConstants.columnLastPullAt} integer
   )
 ''');
+  }
+
+  /// Version 3 migration: product sizes. Additive only — one JSON column;
+  /// existing rows (and fresh seeds) are sizeless (`[]`). The sync engine
+  /// maps the column by name in both directions, so no engine change is
+  /// needed; the server needs `alter table products add column sizes text`.
+  static Future<void> applyV3Migration(Database db) async {
+    await db.execute(
+      'ALTER TABLE ${DbConstants.tableProduct} '
+      "ADD COLUMN ${DbConstants.columnProductSizes} TEXT NOT NULL DEFAULT '[]'",
+    );
+    await db.update(DbConstants.tableProduct, {
+      DbConstants.columnProductSizes: '[]',
+    }, where: '${DbConstants.columnProductSizes} IS NULL');
+  }
+
+  /// Version 4 migration: per-line sizes. The UNIQUE key widens from
+  /// `(invoice_id, product_id)` to `(invoice_id, product_id, size)` — SQLite
+  /// cannot alter constraints, so the table is rebuilt: `_id`s are carried
+  /// over explicitly (outbox `row_id`s and `remote_id` matches survive) and
+  /// every existing line becomes sizeless (`''`). The sync engine maps the
+  /// column by name in both directions; the server needs
+  /// `alter table invoice_lines add column size text not null default ''`.
+  static Future<void> applyV4Migration(Database db) async {
+    await db.execute('''
+create table ${DbConstants.tableInvoiceLine}_new (
+  ${DbConstants.columnId} integer primary key autoincrement,
+  ${DbConstants.columnInvoiceLineInvoiceId} integer not null,
+  ${DbConstants.columnInvoiceLineProductId} integer not null,
+  ${DbConstants.columnInvoiceLineAmount} integer not null,
+  ${DbConstants.columnInvoiceLinePrice} REAL not null,
+  ${DbConstants.columnInvoiceLineSize} TEXT NOT NULL DEFAULT '',
+  ${DbConstants.columnRemoteId} TEXT,
+  ${DbConstants.columnUpdatedAt} INTEGER,
+  ${DbConstants.columnIsDeleted} INTEGER NOT NULL DEFAULT 0,
+  foreign key(${DbConstants.columnInvoiceLineInvoiceId}) references ${DbConstants.tableInvoice}(${DbConstants.columnId}),
+  foreign key(${DbConstants.columnInvoiceLineProductId}) references ${DbConstants.tableProduct}(${DbConstants.columnId}) ON DELETE RESTRICT
+  unique(${DbConstants.columnInvoiceLineInvoiceId}, ${DbConstants.columnInvoiceLineProductId}, ${DbConstants.columnInvoiceLineSize}) ON CONFLICT REPLACE
+  )
+''');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_${DbConstants.tableInvoiceLine}_remote_id '
+      'ON ${DbConstants.tableInvoiceLine}_new (${DbConstants.columnRemoteId})',
+    );
+    await db.execute('''
+INSERT INTO ${DbConstants.tableInvoiceLine}_new (
+  ${DbConstants.columnId},
+  ${DbConstants.columnInvoiceLineInvoiceId},
+  ${DbConstants.columnInvoiceLineProductId},
+  ${DbConstants.columnInvoiceLineAmount},
+  ${DbConstants.columnInvoiceLinePrice},
+  ${DbConstants.columnRemoteId},
+  ${DbConstants.columnUpdatedAt},
+  ${DbConstants.columnIsDeleted},
+  ${DbConstants.columnInvoiceLineSize}
+) SELECT
+  ${DbConstants.columnId},
+  ${DbConstants.columnInvoiceLineInvoiceId},
+  ${DbConstants.columnInvoiceLineProductId},
+  ${DbConstants.columnInvoiceLineAmount},
+  ${DbConstants.columnInvoiceLinePrice},
+  ${DbConstants.columnRemoteId},
+  ${DbConstants.columnUpdatedAt},
+  ${DbConstants.columnIsDeleted},
+  ''
+FROM ${DbConstants.tableInvoiceLine}
+''');
+    await db.execute('DROP TABLE ${DbConstants.tableInvoiceLine}');
+    await db.execute(
+      'ALTER TABLE ${DbConstants.tableInvoiceLine}_new '
+      'RENAME TO ${DbConstants.tableInvoiceLine}',
+    );
   }
 }
 

@@ -44,6 +44,13 @@ void main() {
       );
       expect(a1, hasLength(1));
       expect(a1.first[DbConstants.columnRemoteId], isNull);
+      // Fresh seeds are epoch-old: any server row is strictly newer, so a
+      // second device's pull overwrites pristine defaults (first-write-wins).
+      final all = await db.query(DbConstants.tableProduct);
+      expect(all, hasLength(25));
+      for (final row in all) {
+        expect(row[DbConstants.columnUpdatedAt], DbConstants.seedUpdatedAt);
+      }
     },
   );
 

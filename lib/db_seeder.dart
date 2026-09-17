@@ -15,7 +15,9 @@ class DbSeeder {
   static Future<void> seedProducts(Database db) async {
     // DDL outside the transaction: cheaper and avoids DDL-in-txn.
     await SyncMetadata.ensureOutboxTable(db);
-    final now = DateTime.now().millisecondsSinceEpoch;
+    // Seeds are epoch-old (DbConstants.seedUpdatedAt), never `now`: any
+    // server row is strictly newer so pull overwrites pristine defaults, and
+    // the push ack writes the real server timestamp back after upload.
     await db.transaction((txn) async {
       final count =
           (await txn.rawQuery(
@@ -29,7 +31,8 @@ class DbSeeder {
           DbConstants.columnId: product.$1,
           DbConstants.columnProductModel: product.$2,
           DbConstants.columnProductName: product.$3,
-          DbConstants.columnUpdatedAt: now,
+          DbConstants.columnProductSizes: '[]',
+          DbConstants.columnUpdatedAt: DbConstants.seedUpdatedAt,
           DbConstants.columnIsDeleted: 0,
         });
         // Deterministic key per model: a second device pushing the same

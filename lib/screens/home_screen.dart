@@ -13,7 +13,6 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/nav_listener.dart';
 import 'package:i_gen/widgets/invoice_details_mobile.dart';
 import 'package:i_gen/widgets/product_pricing_table.dart';
-import 'package:i_gen/widgets/sync_spinner.dart';
 
 const _productsPageIndex = 1;
 const _pricingPageIndex = 2;
@@ -182,21 +181,13 @@ class _HomeState extends State<Home> {
 
                     trailing: Padding(
                       padding: const EdgeInsets.only(top: AppGaps.lg),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SyncSpinner(),
-                          FilledButton.icon(
-                            style: const ButtonStyle(
-                              minimumSize: WidgetStatePropertyAll(
-                                Size(200, 56),
-                              ),
-                            ),
-                            onPressed: _onCreateNew,
-                            icon: const Icon(Icons.add),
-                            label: Text(context.l10n.addItem),
-                          ),
-                        ],
+                      child: FilledButton.icon(
+                        style: const ButtonStyle(
+                          minimumSize: WidgetStatePropertyAll(Size(200, 56)),
+                        ),
+                        onPressed: _onCreateNew,
+                        icon: const Icon(Icons.add),
+                        label: Text(context.l10n.addItem),
                       ),
                     ),
                     backgroundColor: context.colorScheme.surface,

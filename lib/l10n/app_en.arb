@@ -321,5 +321,7 @@
         "placeholders": { "count": { "type": "int" } }
     },
     "upToDateStatus": "Up to date",
-    "neverSynced": "Never"
+    "neverSynced": "Never",
+    "sizesColumn": "Sizes",
+    "customSizesHint": "Custom sizes"
 }

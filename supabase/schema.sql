@@ -59,6 +59,7 @@ CREATE TABLE public.products (
   owner_id uuid NOT NULL REFERENCES auth.users (id),
   model text NOT NULL,
   name text NOT NULL,
+  sizes text NOT NULL DEFAULT '[]',
   updated_at timestamptz NOT NULL DEFAULT now(),
   is_deleted boolean NOT NULL DEFAULT false,
   client_op_id text UNIQUE
@@ -96,6 +97,7 @@ CREATE TABLE public.invoice_lines (
   product_id uuid REFERENCES public.products (id),
   amount integer NOT NULL,
   price double precision NOT NULL,
+  size text NOT NULL DEFAULT '',
   updated_at timestamptz NOT NULL DEFAULT now(),
   is_deleted boolean NOT NULL DEFAULT false,
   client_op_id text UNIQUE

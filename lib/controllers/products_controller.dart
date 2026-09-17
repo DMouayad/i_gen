@@ -20,10 +20,15 @@ class ProductsController {
       ..addEntries(fresh.map((e) => MapEntry(e.model, e)));
   }
 
-  Future<void> save({required String model, required String name}) async {
+  Future<void> save({
+    required String model,
+    required String name,
+    List<String> sizes = const [],
+  }) async {
     final newProduct = await GetIt.I.get<ProductRepo>().insertProduct(
       model: model,
       name: name,
+      sizes: sizes,
     );
 
     _products[newProduct.model] = newProduct;

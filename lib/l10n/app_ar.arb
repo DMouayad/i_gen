@@ -321,5 +321,7 @@
         "placeholders": { "count": { "type": "int" } }
     },
     "upToDateStatus": "محدّث",
-    "neverSynced": "أبداً"
+    "neverSynced": "أبداً",
+    "sizesColumn": "المقاسات",
+    "customSizesHint": "مقاسات مخصصة"
 }

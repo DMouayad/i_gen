@@ -207,14 +207,15 @@ class InvoiceTableState extends State<InvoiceTable> {
         titleTextAlign: TrinaColumnTextAlign.center,
         footerRenderer: (_) {
           return Container(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(color: context.colorScheme.outlineVariant),
+              border: BorderDirectional(
+                end: BorderSide(color: context.colorScheme.outlineVariant),
               ),
             ),
             child: Text(
               context.l10n.thankYouNote.toUpperCase(),
+
               style: context.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -394,7 +395,6 @@ class InvoiceTableState extends State<InvoiceTable> {
                               textDirection: numberFormat.locale == 'en'
                                   ? TextDirection.ltr
                                   : TextDirection.rtl,
-                              // locale: Locale(numberFormat.locale),
                             ),
                             if (discount > 0 ||
                                 widget.controller.editingIsEnabled) ...[
@@ -627,6 +627,7 @@ class InvoiceTableState extends State<InvoiceTable> {
           enableMoveHorizontalInEditing: true,
           style: TrinaGridStyleConfig(
             rowHeight: tableRowHeight,
+            cellDirtyColor: AppColors.dirtyCell,
             cellTextStyle: _cellTextStyle(context),
             gridBorderColor: context.colorScheme.surfaceDim,
             borderColor: context.colorScheme.surfaceDim,
@@ -671,14 +672,25 @@ class InvoiceTableState extends State<InvoiceTable> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       widget.controller.hasUnsavedChanges = true;
+      // Carry sizes across desktop edits: the grid has no size cell, so a
+      // rebuilt row inherits its product's previous size. Single-size lines
+      // (and all legacy data) round-trip exactly; two sizes of the same
+      // product edited here collapse onto the first size — set those sizes
+      // on mobile instead.
+      final prevByProduct = <int, InvoiceTableRow>{};
+      for (final l in widget.controller.invoiceLines) {
+        prevByProduct.putIfAbsent(l.product.id, () => l);
+      }
       final invoiceRows = <InvoiceTableRow>[];
       for (var row in stateManager.refRows) {
         if (row.cells['id']!.value case String model) {
+          final product = products[model]!;
           invoiceRows.add(
             InvoiceTableRow(
               unitPrice: row.cells['unit_price']!.value,
-              product: products[model]!,
+              product: product,
               amount: row.cells['amount']!.value,
+              size: prevByProduct[product.id]?.size,
             ),
           );
         }

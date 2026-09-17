@@ -46,12 +46,43 @@ class SupabaseGateway implements RemoteGateway {
     };
     final Map<String, dynamic> saved;
     if (remoteId == null) {
-      // Insert-or-replay: onConflict matches a previous crashed attempt.
-      saved = await _client
-          .from(remoteTable)
-          .upsert(payload, onConflict: 'client_op_id')
-          .select('id,updated_at')
-          .single();
+      // Insert-or-ignore: first writer wins (seed convergence). A replay or
+      // a second device's seed carrying the same `client_op_id` inserts
+      // nothing and returns no row — adopt the winner's identity below
+      // instead of overwriting it (a merging upsert would let a fresh
+      // default clobber an admin's edit).
+      final inserted =
+          (await _client
+                      .from(remoteTable)
+                      .upsert(
+                        payload,
+                        onConflict: 'client_op_id',
+                        ignoreDuplicates: true,
+                      )
+                      .select('id,updated_at')
+                  as List)
+              .map((r) => Map<String, dynamic>.from(r as Map))
+              .toList();
+      if (inserted.isNotEmpty) {
+        saved = inserted.first;
+      } else {
+        // Conflict ignored: the row with this client_op_id already exists.
+        final existing =
+            (await _client
+                        .from(remoteTable)
+                        .select('id,updated_at')
+                        .eq('client_op_id', opId)
+                        .limit(1)
+                    as List)
+                .map((r) => Map<String, dynamic>.from(r as Map))
+                .toList();
+        if (existing.isEmpty) {
+          throw StateError(
+            'upsert ignored duplicate but no row carries client_op_id $opId',
+          );
+        }
+        saved = existing.first;
+      }
     } else {
       // Update path: identity columns are server-owned after insert.
       // client_op_id already matched the row; owner_id must never move

@@ -5,8 +5,8 @@ import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/product.dart';
 import 'package:i_gen/repos/sync_trigger.dart';
 import 'package:i_gen/utils/context_extensions.dart';
-import 'package:i_gen/widgets/read_only_banner.dart';
-import 'package:i_gen/widgets/sync_spinner.dart';
+import 'package:i_gen/widgets/size_multi_select.dart';
+import 'package:i_gen/widgets/sync_button.dart';
 
 class ProductsScreeMobile extends StatefulWidget {
   const ProductsScreeMobile({
@@ -43,10 +43,15 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
     });
   }
 
-  /// Manual refresh: sync, reload the catalog snapshot, refill the list.
-  /// Plain setState refill is safe here (no grid state to lose).
+  /// Manual refresh (pull-to-refresh): sync, then reload below.
   Future<void> _refresh() async {
     await SyncTrigger.instance.syncNow();
+    await _reload();
+  }
+
+  /// Post-sync reload hook for the header SyncButton: refill the list.
+  /// Plain setState refill is safe here (no grid state to lose).
+  Future<void> _reload() async {
     await _productsController.reload();
     if (!mounted) return;
     setState(() {
@@ -106,7 +111,11 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
   }
 
   void _saveProduct(Product product) async {
-    await _productsController.save(model: product.model, name: product.name);
+    await _productsController.save(
+      model: product.model,
+      name: product.name,
+      sizes: product.sizes,
+    );
     // Refresh list from db
     _products = _productsController.products.values.toList();
     _filterProducts();
@@ -133,14 +142,7 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
             title: Text(context.l10n.navProducts),
             backgroundColor: context.colorScheme.surface,
             surfaceTintColor: context.colorScheme.surface,
-            actions: [
-              IconButton(
-                tooltip: context.l10n.refresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: _refresh,
-              ),
-              const SyncSpinner(),
-            ],
+            actions: [SyncButton(onSynced: _reload)],
           ),
           floatingActionButton: readOnly
               ? null
@@ -154,16 +156,6 @@ class _ProductsScreeMobileState extends State<ProductsScreeMobile> {
               constraints: const BoxConstraints(maxWidth: 1024),
               child: Column(
                 children: [
-                  if (readOnly)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppGaps.sm,
-                        AppGaps.sm,
-                        AppGaps.sm,
-                        0,
-                      ),
-                      child: ReadOnlyBanner(text: context.l10n.catalogReadOnly),
-                    ),
                   Padding(
                     padding: const EdgeInsets.all(AppGaps.sm),
                     child: TextField(
@@ -274,9 +266,18 @@ class ProductListItem extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                '${product.model} ${product.name}',
-                style: titleStyle,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${product.model} ${product.name}', style: titleStyle),
+                  if (product.sizes.isNotEmpty)
+                    Text(
+                      product.sizes.join(', '),
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: context.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
             ),
             if (showActions) ...[
@@ -309,18 +310,23 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _modelController;
   late TextEditingController _nameController;
+  late TextEditingController _sizesController;
 
   @override
   void initState() {
     super.initState();
     _modelController = TextEditingController(text: widget.product?.model ?? '');
     _nameController = TextEditingController(text: widget.product?.name ?? '');
+    _sizesController = TextEditingController(
+      text: widget.product?.sizes.join(', ') ?? '',
+    );
   }
 
   @override
   void dispose() {
     _modelController.dispose();
     _nameController.dispose();
+    _sizesController.dispose();
     super.dispose();
   }
 
@@ -330,6 +336,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         id: widget.product?.id ?? -1,
         model: _modelController.text,
         name: _nameController.text,
+        sizes: Product.parseSizeList(_sizesController.text),
       );
       Navigator.of(context).pop(newProduct);
     }
@@ -384,6 +391,31 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: AppGaps.sm),
+            TextFormField(
+              style: textStyle,
+              controller: _sizesController,
+              readOnly: true,
+              onTap: () async {
+                final picked = await showSizeMultiSelect(
+                  context,
+                  initial: Product.parseSizeList(_sizesController.text),
+                  title: '${_modelController.text} · ${_nameController.text}',
+                );
+                if (picked == null) return;
+                setState(() {
+                  _sizesController.text = picked.join(', ');
+                });
+              },
+              decoration: InputDecoration(
+                labelText: context.l10n.sizesColumn,
+                hintText: 'S, M, L',
+                suffixIcon: const Icon(Icons.arrow_drop_down),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+              ),
             ),
           ],
         ),

@@ -8,10 +8,8 @@ import 'package:i_gen/controllers/products_controller.dart';
 import 'package:i_gen/models/price_category.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
-import 'package:i_gen/repos/sync_trigger.dart';
 import 'package:i_gen/utils/context_extensions.dart';
-import 'package:i_gen/widgets/read_only_banner.dart';
-import 'package:i_gen/widgets/sync_spinner.dart';
+import 'package:i_gen/widgets/sync_button.dart';
 import 'package:trina_grid/trina_grid.dart';
 
 class ProductPricingTable extends StatefulWidget {
@@ -28,7 +26,14 @@ class ProductPricingTable extends StatefulWidget {
 }
 
 class _ProductPricingTableState extends State<ProductPricingTable> {
-  final List<TrinaColumn> columns = [];
+  /// Grid data, owned by us (like ProductsScreen2): fetched, then fed to a
+  /// dumb TrinaGrid via constructor. The grid never self-loads, so there is
+  /// no mount-timing race and no stuck loader — loading/error UI below is
+  /// ours and always resolves.
+  List<TrinaColumn> columns = [];
+  List<TrinaRow> rows = [];
+  bool _ready = false;
+  Object? _loadError;
 
   late TrinaGridStateManager stateManager;
   final products = GetIt.I.get<ProductsController>().products;
@@ -82,30 +87,25 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
     });
   }
 
-  bool _columnsInitialized = false;
   int _gridTick = 0;
 
-  /// Manual refresh (invoked after a sync): remount the grid so columns and
-  /// rows rebuild from the repos — but never drop unsaved edits, so a dirty
-  /// grid keeps its state (fresh data appears on next rebuild).
+  /// Manual refresh (invoked after a sync): refetch and remount — but never
+  /// drop unsaved edits, so a dirty grid keeps its state (fresh data appears
+  /// on next rebuild).
   Future<void> _refresh() async {
     if (_disposed || !mounted) return;
     if (dirtyRows.isEmpty &&
         widget.unsavedProductPricingCountNotifier.value == 0 &&
         widget.unsavedPricingCategoryCountNotifier.value == 0) {
-      setState(() => _gridTick++);
+      await _reload();
     }
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Column titles need l10n (an inherited widget), which is illegal in
-    // initState. Build once here; later dependency changes (e.g. theme)
-    // must not rebuild columns or grid state would reset.
-    if (_columnsInitialized) return;
-    _columnsInitialized = true;
-    columns.add(
+  /// The two fixed columns (model + status). Built synchronously with a
+  /// live context at the start of [_reload], before any await — never
+  /// mutated afterwards, so re-runs assemble a fresh list every time.
+  List<TrinaColumn> _baseColumns() {
+    return [
       TrinaColumn(
         title: context.l10n.productModel,
         field: 'model',
@@ -116,8 +116,6 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
         enableContextMenu: false,
         enableEditingMode: false,
       ),
-    );
-    columns.add(
       TrinaColumn(
         title: '',
         field: 'status',
@@ -158,7 +156,7 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
           );
         },
       ),
-    );
+    ];
   }
 
   @override
@@ -173,29 +171,80 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
         stateManager.setAutoEditing(!_readOnlyNotifier.value);
       }
     });
-    _loadGrid();
   }
 
-  Future<void> _loadGrid() async {
-    final fetchedColumns = await fetchCols();
-    // must insert before building rows: fetchRows reads columns.skip(2)
-    stateManager.insertColumns(2, fetchedColumns);
-    final fetchedRows = await fetchRows();
-    final rows = await TrinaGridStateManager.initializeRowsAsync(
-      columns,
-      fetchedRows,
-    );
+  bool _reloadStarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // _baseColumns needs l10n (an inherited widget), which is illegal in
+    // initState — so the first load triggers here. Guarded: later
+    // dependency changes (e.g. theme) must not refetch or reset grid state.
+    if (_reloadStarted) return;
+    _reloadStarted = true;
+    unawaited(_reload());
+  }
+
+  /// Fetch-then-feed (mirrors ProductsScreen2): build fresh columns + rows
+  /// off-grid, then hand them to a dumb TrinaGrid in one setState. The grid
+  /// never self-loads, so there is no mount-timing race, no stuck loader,
+  /// and no double-insert of UniqueKey-keyed instances.
+  Future<void> _reload() async {
     if (_disposed) return;
-    stateManager.refRows.addAll(rows);
-    stateManager.setShowLoading(false);
-  }
-
-  Future<List<TrinaColumn>> fetchCols() async {
-    final categories = await GetIt.I.get<PricingCategoryRepo>().getAll();
-    pricingCategories = categories;
-    return pricingCategories
-        .map((e) => _getColumn(e.name, e.currency, priceCategoryId: e.id))
-        .toList();
+    final base = _baseColumns();
+    try {
+      final categories = await GetIt.I.get<PricingCategoryRepo>().getAll();
+      final matrix = await GetIt.I
+          .get<ProductPricingRepo>()
+          .getProductsPricing();
+      if (_disposed || !mounted) return;
+      pricingCategories = categories;
+      final all = [
+        ...base,
+        ...categories.map(
+          (e) => _getColumn(e.name, e.currency, priceCategoryId: e.id),
+        ),
+      ];
+      final newRows = matrix.entries.map((e) {
+        return TrinaRow(
+          cells: {
+            'model': TrinaCell(value: e.key),
+            ...Map.fromEntries(
+              // skip (model, status) columns
+              all.skip(2).map((col) {
+                return MapEntry(
+                  col.field,
+                  TrinaCell(value: e.value[col.field]?.price),
+                );
+              }),
+            ),
+            'status': TrinaCell(value: 'saved'),
+          },
+        );
+      }).toList();
+      final initialized = await TrinaGridStateManager.initializeRowsAsync(
+        all,
+        newRows,
+      );
+      if (_disposed || !mounted) return;
+      setState(() {
+        columns = all;
+        rows = initialized;
+        // First load mounts the grid with data; later reloads remount so
+        // the grid picks up the new lists (it ignores post-mount updates).
+        if (_ready) _gridTick++;
+        _ready = true;
+        _loadError = null;
+      });
+    } catch (e) {
+      debugPrint('ProductPricingTable: grid load failed: $e');
+      if (!_disposed && mounted) {
+        setState(() {
+          _loadError = e;
+        });
+      }
+    }
   }
 
   TrinaColumn _getColumn(String name, String currency, {int? priceCategoryId}) {
@@ -249,221 +298,188 @@ class _ProductPricingTableState extends State<ProductPricingTable> {
     );
   }
 
-  Future<List<TrinaRow>> fetchRows() async {
-    final productsPricing = await GetIt.I
-        .get<ProductPricingRepo>()
-        .getProductsPricing();
-    return productsPricing.entries.map((e) {
-      return TrinaRow(
-        cells: {
-          'model': TrinaCell(value: e.key),
-          ...Map.fromEntries(
-            // skip (model, status) columns
-            columns.skip(2).map((col) {
-              return MapEntry(
-                col.field,
-                TrinaCell(value: e.value[col.field]?.price),
-              );
-            }),
-          ),
-          'status': TrinaCell(value: 'saved'),
-        },
-      );
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: context.isMobile ? context.width : 920,
-          ),
-          child: TrinaGrid(
-            key: ValueKey(_gridTick),
-            columns: columns,
-            rows: [],
-            onChanged: (TrinaGridOnChangedEvent event) {
-              if (_readOnlyNotifier.value) return;
-              updateDirtyCount();
-              dirtyRows.add(event.rowIdx);
-
-              if (event.row.cells['status']!.value == 'saved') {
-                event.row.cells['status']!.value = 'edited';
-              }
-            },
-            configuration: TrinaGridConfiguration(
-              style: TrinaGridStyleConfig(
-                cellDirtyColor: context.colorScheme.tertiaryContainer,
-                borderColor: context.colorScheme.surfaceDim,
-                gridBorderColor: context.colorScheme.surfaceDim,
-                gridBorderRadius: BorderRadius.circular(AppRadii.card),
-                cellTextStyle: _cellTextStyle(context),
-                columnTextStyle: _columnTextStyle(context),
-                evenRowColor: context.colorScheme.surfaceContainerLowest,
-                oddRowColor: context.colorScheme.surface,
+    // Our own loading/error states: the grid below only ever mounts with
+    // complete data, so its internal loader is never engaged.
+    if (!_ready && _loadError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.l10n.unexpectedError('$_loadError')),
+            const SizedBox(height: AppGaps.sm),
+            OutlinedButton(
+              style: const ButtonStyle(
+                minimumSize: WidgetStatePropertyAll(Size(64, 48)),
               ),
+              onPressed: _reload,
+              child: Text(context.l10n.retry),
             ),
-            createHeader: (stateManager) {
-              return ValueListenableBuilder<bool>(
-                valueListenable: _readOnlyNotifier,
-                builder: (context, readOnly, _) {
-                  return Container(
-                    height: 48,
-                    alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ValueListenableBuilder(
-                          valueListenable:
-                              widget.unsavedProductPricingCountNotifier,
-                          builder: (context, value, child) {
-                            return value <= 0 || readOnly
-                                ? SizedBox.shrink()
-                                : TextButton.icon(
-                                    style: TextButton.styleFrom(
-                                      minimumSize: const Size(64, 48),
-                                    ),
-                                    label: Text(
-                                      context.l10n.saveAllButton,
-                                      style: _columnTextStyle(context),
-                                    ),
-                                    icon: Icon(Icons.save),
-                                    onPressed: () async {
-                                      stateManager.setShowLoading(true);
-                                      for (final rowId in dirtyRows) {
-                                        var row = stateManager.refRows[rowId];
-                                        for (final cell in row.cells.values) {
-                                          if (cell.isDirty) {
-                                            final priceCategory =
-                                                pricingCategories.firstWhere(
-                                                  (element) =>
-                                                      element.name ==
-                                                      cell.column.title,
-                                                );
-                                            await GetIt.I
-                                                .get<ProductPricingRepo>()
-                                                .save(
-                                                  priceCategoryId:
-                                                      priceCategory.id,
-                                                  productId:
-                                                      products[row
-                                                              .cells['model']!
-                                                              .value]!
-                                                          .id,
-                                                  price: cell.value,
-                                                  currency:
-                                                      priceCategory.currency,
-                                                );
-                                          }
-                                          stateManager.commitChanges(
-                                            cell: cell,
-                                          );
-                                          stateManager
-                                                  .refRows[rowId]
-                                                  .cells['status']!
-                                                  .value =
-                                              'saved';
-                                        }
-                                      }
-                                      stateManager.setShowLoading(false);
-                                      dirtyRows.clear();
-                                      updateDirtyCount();
-                                    },
-                                  );
-                          },
-                        ),
-                        if (!readOnly)
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border(
-                                left: BorderSide(
-                                  color: context.colorScheme.surfaceDim,
+          ],
+        ),
+      );
+    }
+    if (!_ready) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: context.isMobile ? context.width : 920,
+      ),
+      child: TrinaGrid(
+        key: ValueKey(_gridTick),
+        columns: columns,
+        rows: rows,
+        onChanged: (TrinaGridOnChangedEvent event) {
+          if (_readOnlyNotifier.value) return;
+          updateDirtyCount();
+          dirtyRows.add(event.rowIdx);
+
+          if (event.row.cells['status']!.value == 'saved') {
+            event.row.cells['status']!.value = 'edited';
+          }
+        },
+        configuration: TrinaGridConfiguration(
+          style: TrinaGridStyleConfig(
+            cellDirtyColor: AppColors.dirtyCell,
+            borderColor: context.colorScheme.surfaceDim,
+            gridBorderColor: context.colorScheme.surfaceDim,
+            gridBorderRadius: BorderRadius.circular(AppRadii.card),
+            cellTextStyle: _cellTextStyle(context),
+            columnTextStyle: _columnTextStyle(context),
+            evenRowColor: context.colorScheme.surfaceContainerLowest,
+            oddRowColor: context.colorScheme.surface,
+          ),
+        ),
+        createHeader: (stateManager) {
+          return ValueListenableBuilder<bool>(
+            valueListenable: _readOnlyNotifier,
+            builder: (context, readOnly, _) {
+              return Container(
+                height: 48,
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ValueListenableBuilder(
+                      valueListenable:
+                          widget.unsavedProductPricingCountNotifier,
+                      builder: (context, value, child) {
+                        return value <= 0 || readOnly
+                            ? SizedBox.shrink()
+                            : TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(64, 48),
                                 ),
-                              ),
+                                label: Text(
+                                  context.l10n.saveAllButton,
+                                  style: _columnTextStyle(context),
+                                ),
+                                icon: Icon(Icons.save),
+                                onPressed: () async {
+                                  stateManager.setShowLoading(true);
+                                  for (final rowId in dirtyRows) {
+                                    var row = stateManager.refRows[rowId];
+                                    for (final cell in row.cells.values) {
+                                      if (cell.isDirty) {
+                                        final priceCategory = pricingCategories
+                                            .firstWhere(
+                                              (element) =>
+                                                  element.name ==
+                                                  cell.column.title,
+                                            );
+                                        await GetIt.I
+                                            .get<ProductPricingRepo>()
+                                            .save(
+                                              priceCategoryId: priceCategory.id,
+                                              productId:
+                                                  products[row
+                                                          .cells['model']!
+                                                          .value]!
+                                                      .id,
+                                              price: cell.value,
+                                              currency: priceCategory.currency,
+                                            );
+                                      }
+                                      stateManager.commitChanges(cell: cell);
+                                      stateManager
+                                              .refRows[rowId]
+                                              .cells['status']!
+                                              .value =
+                                          'saved';
+                                    }
+                                  }
+                                  stateManager.setShowLoading(false);
+                                  dirtyRows.clear();
+                                  updateDirtyCount();
+                                },
+                              );
+                      },
+                    ),
+                    if (!readOnly)
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: context.colorScheme.surfaceDim,
                             ),
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(64, 48),
-                              ),
-                              onPressed: () async {
-                                final currency = currencies.keys.first;
-
-                                final res = await showDialog(
-                                  context: context,
-                                  builder: (context) =>
-                                      _EditPriceCategoryDialog(
-                                        name: '',
-                                        currency: currency,
-                                        existingCategories: pricingCategories,
-                                      ),
-                                );
-                                if (res case (
-                                  int id,
-                                  String name,
-                                  String currency,
-                                )) {
-                                  final index = stateManager.refColumns.length;
-                                  final newCol = _getColumn(name, currency);
-                                  stateManager.insertColumns(index, [newCol]);
-                                  pricingCategories.add(
-                                    PriceCategory(
-                                      id: id,
-                                      name: name,
-                                      currency: currency,
-                                    ),
-                                  );
-                                }
-                              },
-                              label: Text(
-                                context.l10n.newPriceList,
-                                style: _cellTextStyle(context),
-                              ),
-                              icon: Icon(Icons.add_box),
-                            ),
-                          ),
-                        Spacer(),
-                        const SyncSpinner(),
-
-                        IconButton(
-                          tooltip: context.l10n.refresh,
-                          icon: const Icon(Icons.refresh),
-                          onPressed: () => SyncTrigger.instance.syncNow().then(
-                            (_) => _refresh(),
-                            onError: (_) => _refresh(),
                           ),
                         ),
-                      ],
-                    ),
-                  );
-                },
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(64, 48),
+                          ),
+                          onPressed: () async {
+                            final currency = currencies.keys.first;
+
+                            final res = await showDialog(
+                              context: context,
+                              builder: (context) => _EditPriceCategoryDialog(
+                                name: '',
+                                currency: currency,
+                                existingCategories: pricingCategories,
+                              ),
+                            );
+                            if (res case (
+                              int id,
+                              String name,
+                              String currency,
+                            )) {
+                              final index = stateManager.refColumns.length;
+                              final newCol = _getColumn(name, currency);
+                              stateManager.insertColumns(index, [newCol]);
+                              pricingCategories.add(
+                                PriceCategory(
+                                  id: id,
+                                  name: name,
+                                  currency: currency,
+                                ),
+                              );
+                            }
+                          },
+                          label: Text(
+                            context.l10n.newPriceList,
+                            style: _cellTextStyle(context),
+                          ),
+                          icon: Icon(Icons.add_box),
+                        ),
+                      ),
+                    Spacer(),
+                    SyncButton(onSynced: _refresh),
+                  ],
+                ),
               );
             },
-            onLoaded: (TrinaGridOnLoadedEvent event) {
-              stateManager = event.stateManager;
-
-              /// When the grid is finished loading, enable loading.
-              stateManager.setChangeTracking(true);
-              stateManager.setAutoEditing(!_readOnlyNotifier.value);
-              stateManager.setShowLoading(true);
-              _gridReady = true;
-            },
-          ),
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: _readOnlyNotifier,
-          builder: (context, readOnly, _) {
-            if (!readOnly) return const SizedBox.shrink();
-            return Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: ReadOnlyBanner(text: context.l10n.pricingReadOnlyMessage),
-            );
-          },
-        ),
-      ],
+          );
+        },
+        onLoaded: (TrinaGridOnLoadedEvent event) {
+          stateManager = event.stateManager;
+          stateManager.setChangeTracking(true);
+          stateManager.setAutoEditing(!_readOnlyNotifier.value);
+          _gridReady = true;
+        },
+      ),
     );
   }
 }

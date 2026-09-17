@@ -15,6 +15,11 @@ abstract final class AppRadii {
   static const double dialog = 12;
 }
 
+abstract final class AppColors {
+  /// Edited-but-unsaved grid cells, shared by every trina grid.
+  static const Color dirtyCell = Color(0xFFFFF3C4);
+}
+
 extension ScreenExtensions on BuildContext {
   double get width => MediaQuery.of(this).size.width;
   double get height => MediaQuery.of(this).size.height;
