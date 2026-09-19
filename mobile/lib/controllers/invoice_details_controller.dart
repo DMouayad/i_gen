@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:i_gen/controllers/cart_controller.dart';
 import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/invoice_table_row.dart';
+import 'package:i_gen/models/order.dart';
 import 'package:i_gen/models/product.dart';
 import 'package:i_gen/repos/invoice_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
@@ -19,27 +20,9 @@ class InvoiceDetailsController {
       _enableEditing = ValueNotifier(invoice == null),
       invoiceId = invoice?.id,
       invoiceLines =
-          invoice?.lines.map(InvoiceTableRow.fromInvoiceLine).toList() ?? [] {
-    totalNotifier = ValueNotifier(_getTotal());
-    // Seed the cart from the saved lines BEFORE the sync listener attaches,
-    // so opening an existing invoice never latches unsaved state.
-    for (final row in invoiceLines) {
-      cart.add(
-        row.product,
-        size: row.size,
-        price: row.unitPrice,
-        qty: row.amount,
-      );
-    }
-    cart.addListener(_syncLinesFromCart);
-    // Init text is set above, before this listener attaches, so construction
-    // itself never latches.
-    _cleanCustomerName = _customerNameController.text;
-    _customerNameController.addListener(() {
-      if (_customerNameController.text != _cleanCustomerName) {
-        _hasUnsavedChanges.value = true;
-      }
-    });
+          invoice?.lines.map(InvoiceTableRow.fromInvoiceLine).toList() ?? [],
+      orderId = invoice?.orderId {
+    _initCartAndListeners();
   }
 
   final ValueNotifier<int> textSizeNotifier = ValueNotifier(20);
@@ -47,6 +30,10 @@ class InvoiceDetailsController {
   int? invoiceId;
   String currency;
   Invoice? invoice;
+
+  /// Server order uuid this invoice was made from (null = manual invoice).
+  /// Set once at prefill, then carried through every save.
+  String? orderId;
   final GlobalKey formKey = GlobalKey<FormState>();
   final ValueNotifier<DateTime> _invoiceDate;
   final TextEditingController _customerNameController;
@@ -136,6 +123,9 @@ class InvoiceDetailsController {
         discount: discount,
         total: totalNotifier.value,
         lines: invoiceLines,
+        // Origin rides along on creation; updates preserve the stored one
+        // (the repo never rewrites it).
+        orderId: orderId ?? invoice?.orderId,
       );
       invoiceId = invoice?.id;
       _cleanCustomerName = customerName;
@@ -145,6 +135,80 @@ class InvoiceDetailsController {
 
   void reCalculateTotal() {
     totalNotifier.value = _getTotal();
+  }
+
+  /// Prefilled new invoice from a customer order (no [Invoice] yet).
+  /// Prices stay 0 (customers order blind) and the category stays custom,
+  /// so staff price it like any new invoice. Latched unsaved: the prefill is
+  /// content, so Save must persist even before further edits.
+  InvoiceDetailsController.fromCustomerOrder({
+    required String customerName,
+    required String currency,
+    required List<InvoiceTableRow> lines,
+    required this.orderId,
+  }) : _invoiceDate = ValueNotifier(DateTime.now()),
+       _customerNameController = TextEditingController(text: customerName),
+       currency = currency,
+       discount = 0,
+       _enableEditing = ValueNotifier(true),
+       invoiceId = null,
+       invoice = null,
+       invoiceLines = List.of(lines) {
+    priceCategoryNotifier.value = (currency: currency, name: null);
+    _initCartAndListeners();
+    _hasUnsavedChanges.value = true;
+  }
+
+  /// Matches customer-order lines to local products by model (natural
+  /// key, same rule as catalog sync convergence). Prices stay 0 — the web
+  /// app orders blind — and sizes carry over. Returns matched rows plus a
+  /// skipped count (unknown/deleted products); skips are counted, never
+  /// silent, so the caller can report them.
+  static ({List<InvoiceTableRow> rows, int skipped}) matchOrderLines(
+    List<OrderItem> items,
+    Map<String, Product> productsByModel,
+  ) {
+    final rows = <InvoiceTableRow>[];
+    var skipped = 0;
+    for (final item in items) {
+      final product = productsByModel[item.productModel ?? ''];
+      if (product == null) {
+        skipped++;
+        continue;
+      }
+      rows.add(
+        InvoiceTableRow(
+          unitPrice: 0,
+          amount: item.amount,
+          product: product,
+          size: item.size.isEmpty ? null : item.size,
+        ),
+      );
+    }
+    return (rows: rows, skipped: skipped);
+  }
+
+  void _initCartAndListeners() {
+    totalNotifier = ValueNotifier(_getTotal());
+    // Seed the cart from the lines BEFORE the sync listener attaches,
+    // so opening never latches unsaved state by itself.
+    for (final row in invoiceLines) {
+      cart.add(
+        row.product,
+        size: row.size,
+        price: row.unitPrice,
+        qty: row.amount,
+      );
+    }
+    cart.addListener(_syncLinesFromCart);
+    // Init text is set above, before this listener attaches, so construction
+    // itself never latches.
+    _cleanCustomerName = _customerNameController.text;
+    _customerNameController.addListener(() {
+      if (_customerNameController.text != _cleanCustomerName) {
+        _hasUnsavedChanges.value = true;
+      }
+    });
   }
 
   void _syncLinesFromCart() {

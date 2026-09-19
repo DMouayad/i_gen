@@ -2,15 +2,15 @@
 
 ## Problem Statement
 
-Distributors place orders in the web app, but staff only learn about them by
+Customers place orders in the web app, but staff only learn about them by
 opening the orders screen and pulling to refresh. The owner wants staff phones
-to buzz when a new distributor order lands — instantly while the app is alive,
+to buzz when a new customer order lands — instantly while the app is alive,
 shortly after otherwise — without building push infrastructure yet.
 
 ## Solution
 
 An order watcher, active only for signed-in staff (admin/employee, never
-distributors): a Supabase Realtime INSERT subscription on `orders` for the
+customers): a Supabase Realtime INSERT subscription on `orders` for the
 instant path, plus a 60-second `OrdersRepo` poll as the gap fallback, both
 feeding one dedupe gate that fires a single OS tray notification per order.
 This is the repo's single scoped Realtime exception (AGENTS.md): the sync
@@ -18,13 +18,13 @@ domain stays reconnect-pull; only new-order alerts use Realtime.
 
 ## User Stories
 
-1. As staff with the app open, I want a buzz within seconds of a distributor
+1. As staff with the app open, I want a buzz within seconds of a customer
    placing an order, so that I can confirm it without staring at the screen.
 2. As staff returning after a signal gap, I want the missed orders to notify
    on the next poll, so that reconnects never silently skip an order.
 3. As staff restarting the app, I want no flood of old orders, so that only
    orders newer than my last seen one ever notify.
-4. As a distributor, I want no watcher, no subscription, and no notification
+4. As a customer, I want no watcher, no subscription, and no notification
    permission prompts, so that my path stays exactly as today.
 5. As a signed-out user, I want zero watcher activity, so that login stays
    optional and the app behaves exactly as today.
@@ -36,7 +36,7 @@ domain stays reconnect-pull; only new-order alerts use Realtime.
 - Server: `orders` is added to the `supabase_realtime` publication (dashboard
   SQL, done once). INSERT payloads carry the full row under default replica
   identity — no migration, no RLS change (`orders_staff_read` already covers
-  staff; distributors only ever see their own rows).
+  staff; customers only ever see their own rows).
 - Seams: `OrdersRepo.getOrders` is reused for the poll (no new query; volume
   is low). New seams are `OrderEvents` (Realtime channel wrapper with a fake
   for tests) and `OrderNotifier` (tray-notification wrapper with a fake).
@@ -70,7 +70,7 @@ domain stays reconnect-pull; only new-order alerts use Realtime.
   subscribes + baselines without notifying; Realtime INSERT of a pending
   order notifies once; the same order arriving via poll afterwards does not
   re-notify; non-pending inserts stay silent; restart with persisted cursor
-  notifies only newer orders; logout/distributor/unconfigured never
+  notifies only newer orders; logout/customer/unconfigured never
   subscribes and stops the timer.
 - Realtime itself is not unit-tested (transport); the poll fallback is the
   covered path and the production safety net.
@@ -81,5 +81,5 @@ domain stays reconnect-pull; only new-order alerts use Realtime.
   Function — a later phase if staff routinely kill the app).
 - Guaranteed background-suspended delivery (OS throttles timers and sockets;
   without FCM the background path is best-effort — documented, not promised).
-- Order deep-link on tap, quiet hours, per-distributor muting, status-change
+- Order deep-link on tap, quiet hours, per-customer muting, status-change
   alerts (only new pending orders notify), web-app changes.

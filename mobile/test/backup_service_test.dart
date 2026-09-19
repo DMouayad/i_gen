@@ -173,15 +173,17 @@ void main() {
     expect(_autoBackups(appDir), hasLength(1));
 
     // Stale stamp plus old dummies: a new backup is written and only the
-    // newest 3 files survive.
+    // newest 3 files survive. Explicit mtimes (not creation order) so the
+    // test never depends on filesystem timestamp granularity under load.
     await prefs.setInt(
       BackupService.lastAutoBackupKey,
       DateTime.now().subtract(const Duration(days: 8)).millisecondsSinceEpoch,
     );
+    final base = DateTime(2020, 1, 1);
     for (var i = 1; i <= 4; i++) {
-      await File(
-        p.join(appDir.path, 'auto-backup-2020010$i-0000.db'),
-      ).writeAsString('stale-$i');
+      final dummy = File(p.join(appDir.path, 'auto-backup-2020010$i-0000.db'));
+      await dummy.writeAsString('stale-$i');
+      await dummy.setLastModified(base.add(Duration(hours: i)));
     }
     await service.maybeAutoBackup(prefs);
     final kept = _autoBackups(appDir)..sort((a, b) => a.path.compareTo(b.path));

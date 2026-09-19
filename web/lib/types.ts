@@ -1,5 +1,5 @@
 // Shared shapes for the orders domain (server columns, Phase 10/12).
-// Prices never surface here: distributors order blind (price written as 0).
+// Prices never surface here: customers order blind (price written as 0).
 
 export interface Product {
   id: string;
@@ -44,7 +44,7 @@ export interface CartLine {
   qty: number;
 }
 
-export type OrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
+export type OrderStatus = "pending" | "completed";
 
 export interface OrderRow {
   id: string;

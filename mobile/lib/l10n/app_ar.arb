@@ -14,7 +14,7 @@
     "@total": { "description": "Invoice total label" },
     "addItem": "إضافة صنف",
     "@addItem": { "description": "Button to add an invoice line item" },
-
+    "createInvoiceBtn": "إنشاء فاتورة",
     "sortLabel": "فرز",
     "sortAz": "من أ إلى ي",
     "sortZa": "من ي إلى أ",
@@ -63,8 +63,8 @@
 
     "ordersNeedSyncConfig": "الطلبات بحاجة لإعداد المزامنة — يعمل التطبيق دون اتصال.",
     "ordersSignInPrompt": "سجّل الدخول من الإعدادات لعرض الطلبات.",
-    "ordersDistributorGuidance": "يقوم الموزّعون بتقديم ومتابعة الطلبات في تطبيق الويب — افتح رابط الترحيب للمتابعة هناك.",
-    "distributors": "الموزّعون",
+    "ordersCustomerGuidance": "يقوم العملاء بتقديم ومتابعة الطلبات في تطبيق الويب — افتح رابط الترحيب للمتابعة هناك.",
+    "customers": "العملاء",
     "noConnectionOrders": "لا يوجد اتصال — اتصل لعرض الطلبات الحية.",
     "couldNotLoadOrders": "تعذّر تحميل الطلبات: {error}",
     "@couldNotLoadOrders": {
@@ -73,15 +73,8 @@
     "retry": "إعادة المحاولة",
     "refresh": "تحديث",
     "noOrdersYet": "لا توجد طلبات بعد.",
-    "orderAmountTitle": "{total} {currency}",
-    "@orderAmountTitle": {
-        "placeholders": {
-            "total": { "type": "String" },
-            "currency": { "type": "String" }
-        }
-    },
     "newOrderChannelName": "طلبات جديدة",
-    "newOrderChannelDescription": "تنبيهات عند تقديم موزع لطلب.",
+    "newOrderChannelDescription": "تنبيهات عند تقديم عميل لطلب.",
     "newOrderTitle": "طلب جديد",
     "newOrderBody": "{total} {currency}",
     "@newOrderBody": {
@@ -99,30 +92,26 @@
     },
     "filterAll": "الكل",
     "orderStatusPending": "قيد الانتظار",
-    "orderStatusConfirmed": "مؤكد",
-    "orderStatusDelivered": "تم التسليم",
-    "orderStatusCancelled": "ملغي",
-    "noConnectionShort": "لا يوجد اتصال.",
+    "orderStatusCompleted": "مكتمل",
     "unexpectedError": "{error}",
     "@unexpectedError": {
         "placeholders": { "error": { "type": "String" } }
     },
-    "orderDetailTitle": "طلب · {status}",
-    "@orderDetailTitle": {
-        "placeholders": { "status": { "type": "String" } }
-    },
     "orderNoLines": "لا توجد أصناف في هذا الطلب.",
-    "orderItemAmount": "×{amount}",
-    "@orderItemAmount": {
-        "placeholders": { "amount": { "type": "String" } }
+    "orderInvoiced": "تمت الفوترة",
+    "createInvoice": "إنشاء فاتورة",
+    "goToInvoice": "الذهاب إلى الفاتورة",
+    "orderSkippedLines": "تم تخطي {count} أصناف (المنتج غير موجود)",
+    "@orderSkippedLines": {
+        "placeholders": { "count": { "type": "int" } }
     },
     "close": "إغلاق",
-    "noConnectionDistributors": "لا يوجد اتصال — اتصل لعرض الموزّعين.",
-    "couldNotLoadDistributors": "تعذّر تحميل الموزّعين: {error}",
-    "@couldNotLoadDistributors": {
+    "noConnectionCustomers": "لا يوجد اتصال — اتصل لعرض العملاء.",
+    "couldNotLoadCustomers": "تعذّر تحميل العملاء: {error}",
+    "@couldNotLoadCustomers": {
         "placeholders": { "error": { "type": "String" } }
     },
-    "noDistributorsYet": "لا يوجد موزّعون بعد — ادعُ أحدهم من الإعدادات.",
+    "noCustomersYet": "لا يوجد عملاء بعد — ادعُ واحداً من الإعدادات.",
 
     "productIdColumn": "المعرّف",
     "productAlreadyExists": "يوجد منتج بالنموذج {model} مسبقًا",
@@ -175,7 +164,7 @@
     "phoneWhatsappLabel": "الهاتف (واتساب)",
     "roleFieldLabel": "الدور",
     "roleEmployee": "موظف",
-    "roleDistributor": "موزّع",
+    "roleCustomer": "عميل",
     "inviteActionLabel": "الإجراء",
     "inviteModeNew": "دعوة جديدة",
     "inviteModeResend": "إعادة إرسال الرابط",

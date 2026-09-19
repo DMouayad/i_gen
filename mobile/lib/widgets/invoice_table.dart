@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:i_gen/controllers/invoice_details_controller.dart';
 import 'package:i_gen/controllers/products_controller.dart';
+import 'package:i_gen/design/tokens.dart';
 import 'package:i_gen/models/invoice_table_row.dart';
 import 'package:i_gen/repos/pricing_category_repo.dart';
 import 'package:i_gen/repos/product_pricing_repo.dart';
 import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/futuristic.dart';
+import 'package:i_gen/utils/numbers.dart';
 import 'package:i_gen/widgets/trina_drop_down_renderer.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:trina_grid/trina_grid.dart';
@@ -35,31 +37,31 @@ class InvoiceTableState extends State<InvoiceTable> {
 
   TextStyle _cellTextStyle(BuildContext context) =>
       context.textTheme.bodyLarge!.copyWith(
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w600,
         fontFeatures: const [FontFeature.tabularFigures()],
+        fontFamily: BrandFonts.arabic,
         fontSize: widget.controller.textSizeNotifier.value.toDouble(),
       );
 
   TextStyle _smallLabelStyle(BuildContext context) =>
       context.textTheme.bodyMedium!.copyWith(
         fontWeight: FontWeight.w600,
+        fontFamily: BrandFonts.arabic,
         fontFeatures: const [FontFeature.tabularFigures()],
       );
 
   TextStyle _moneyStyle(BuildContext context) =>
-      context.textTheme.titleMedium!.copyWith(
-        fontWeight: FontWeight.bold,
+      context.textTheme.titleLarge!.copyWith(
+        fontWeight: FontWeight.w600,
+        fontFamily: BrandFonts.arabic,
         fontFeatures: const [FontFeature.tabularFigures()],
       );
 
   TextStyle _titleRendererStyle(BuildContext context) =>
       context.textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w600);
+
   String formatNumber(num n) {
-    return switch (selectedPriceCategory.currency) {
-      'SP' => NumberFormat.decimalPatternDigits(decimalDigits: 0).format(n),
-      'USD' => NumberFormat.decimalPatternDigits(decimalDigits: 2).format(n),
-      _ => NumberFormat.decimalPatternDigits(decimalDigits: 0).format(n),
-    };
+    return NumberFormat.decimalPatternDigits(decimalDigits: 0).format(n);
   }
 
   Widget _cellRenderer(
@@ -101,7 +103,7 @@ class InvoiceTableState extends State<InvoiceTable> {
   final double tableRowHeight = 52;
   final double extraHeight = 85;
   final double footerExpandedHeight = 135;
-  final double heightToAddWhenFooterIsExpanded = 104;
+  final double heightToAddWhenFooterIsExpanded = 110;
   double getTotal(TrinaGridStateManager stateManager) {
     final lineTotals = stateManager.refRows
         .map((e) => (e.cells['line_total']!.value as num).toDouble())
@@ -164,7 +166,7 @@ class InvoiceTableState extends State<InvoiceTable> {
     _depsInitialized = true;
     columns = [
       TrinaColumn(
-        title: context.l10n.productModel.toUpperCase(),
+        title: context.l10n.productModel,
         field: 'id',
         type: TrinaColumnType.select(products.keys.map((e) => e).toList()),
         enableEditingMode: true,
@@ -196,7 +198,7 @@ class InvoiceTableState extends State<InvoiceTable> {
             ),
       ),
       TrinaColumn(
-        title: context.l10n.productDescription.toUpperCase(),
+        title: context.l10n.productDescription,
         field: 'desc',
         enableAutoEditing: true,
         enableColumnDrag: false,
@@ -214,10 +216,11 @@ class InvoiceTableState extends State<InvoiceTable> {
               ),
             ),
             child: Text(
-              context.l10n.thankYouNote.toUpperCase(),
-
+              context.l10n.thankYouNote,
               style: context.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
+                fontFamily: BrandFonts.arabic,
+                fontFamilyFallback: [],
               ),
             ),
           );
@@ -255,7 +258,7 @@ class InvoiceTableState extends State<InvoiceTable> {
         enableAutoEditing: true,
         renderer: (rendererContext) => _cellRenderer(rendererContext, false),
         titleTextAlign: TrinaColumnTextAlign.center,
-        title: context.l10n.quantity.toUpperCase(),
+        title: context.l10n.quantity,
         field: 'amount',
         minWidth: 70,
         type: TrinaColumnType.number(negative: false, allowFirstDot: false),
@@ -281,7 +284,7 @@ class InvoiceTableState extends State<InvoiceTable> {
           );
         },
         titleTextAlign: TrinaColumnTextAlign.center,
-        title: context.l10n.unitPrice.toUpperCase(),
+        title: context.l10n.unitPrice,
         field: 'unit_price',
         minWidth: 150,
         type: TrinaColumnType.number(
@@ -297,9 +300,7 @@ class InvoiceTableState extends State<InvoiceTable> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  discount > 0
-                      ? context.l10n.subtotal
-                      : context.l10n.total.toUpperCase(),
+                  discount > 0 ? context.l10n.subtotal : context.l10n.total,
                   style: _smallLabelStyle(context),
                 ),
                 if (discount > 0 || widget.controller.editingIsEnabled) ...[
@@ -327,9 +328,17 @@ class InvoiceTableState extends State<InvoiceTable> {
                                 onFieldSubmitted: (value) {
                                   Navigator.of(context).pop();
                                   setState(() {
-                                    discount = double.tryParse(value) ?? 0;
+                                    discount =
+                                        parseCanonicalDecimal(
+                                          value,
+                                        )?.toDouble() ??
+                                        0;
                                   });
                                   widget.controller.discount = discount;
+                                  // Discount-only edits must latch: saveToDB
+                                  // writes only when dirty, otherwise Save
+                                  // silently skips and the value is lost.
+                                  widget.controller.hasUnsavedChanges = true;
                                 },
                               ),
                             ),
@@ -345,7 +354,7 @@ class InvoiceTableState extends State<InvoiceTable> {
                     ),
                   ),
                   SizedBox(height: AppGaps.sm),
-                  Text('${context.l10n.total.toUpperCase()}:'),
+                  Text('${context.l10n.total}:'),
                 ],
               ],
             ),
@@ -358,7 +367,7 @@ class InvoiceTableState extends State<InvoiceTable> {
         renderer: _cellRenderer,
         titleTextAlign: TrinaColumnTextAlign.center,
         textAlign: TrinaColumnTextAlign.center,
-        title: context.l10n.lineTotal.toUpperCase(),
+        title: context.l10n.lineTotal,
         field: 'line_total',
         minWidth: 200,
         enableAutoEditing: false,
@@ -377,9 +386,10 @@ class InvoiceTableState extends State<InvoiceTable> {
                   rendererContext: rendererContext,
                   type: TrinaAggregateColumnType.sum,
                   alignment: Alignment.center,
-                  numberFormat: NumberFormat.decimalPatternDigits(
+                  numberFormat: NumberFormat.currency(
                     locale: getNumberFormat().locale,
                     decimalDigits: getNumberFormat().decimalDigits,
+                    symbol: getNumberFormat().currencySymbol,
                   ),
                   titleSpanBuilder: (sumValue) {
                     final numberFormat = getNumberFormat();
@@ -388,23 +398,15 @@ class InvoiceTableState extends State<InvoiceTable> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: AppGaps.sm,
                           children: [
-                            Text(
-                              '$sumValue ${numberFormat.currencySymbol}',
-                              style: _moneyStyle(context),
-                              textDirection: numberFormat.locale == 'en'
-                                  ? TextDirection.ltr
-                                  : TextDirection.rtl,
-                            ),
+                            Text(sumValue, style: _moneyStyle(context)),
                             if (discount > 0 ||
                                 widget.controller.editingIsEnabled) ...[
-                              SizedBox(height: AppGaps.sm),
                               Text(
                                 '- ${numberFormat.format(discount)}',
                                 style: _moneyStyle(context),
-                                textAlign: TextAlign.start,
                               ),
-                              SizedBox(height: AppGaps.sm),
                               Text(
                                 numberFormat.format(
                                   getTotalWithDiscount(rendererContext),
@@ -435,14 +437,8 @@ class InvoiceTableState extends State<InvoiceTable> {
         enableColumnDrag: false,
         frozen: TrinaColumnFrozen.end,
         footerRenderer: (context) {
-          return IconButton.filled(
-            style: ButtonStyle(
-              shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.control),
-                ),
-              ),
-            ),
+          return IconButton(
+            mouseCursor: SystemMouseCursors.click,
             onPressed: () {
               setState(() {
                 tableHeight += tableRowHeight;
@@ -458,7 +454,7 @@ class InvoiceTableState extends State<InvoiceTable> {
 
               stateManager.setHoveredRowIdx(newLastRow.sortIdx);
             },
-            icon: Icon(Icons.add),
+            icon: const Icon(Icons.add),
           );
         },
         titleRenderer: (rendererContext) {
@@ -471,7 +467,7 @@ class InvoiceTableState extends State<InvoiceTable> {
               alignment: Alignment.center,
               child: Futuristic(
                 autoStart: true,
-                key: Key('priceCategoryDropdown'),
+                key: const Key('priceCategoryDropdown'),
                 futureBuilder: () =>
                     GetIt.I.get<PricingCategoryRepo>().getAll(),
                 dataBuilder: (context, categories) {
@@ -618,51 +614,55 @@ class InvoiceTableState extends State<InvoiceTable> {
   Widget build(BuildContext context) {
     return SizedBox(
       height: tableHeight,
-      child: TrinaGrid(
-        configuration: TrinaGridConfiguration(
-          enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
-          columnSize: TrinaGridColumnSizeConfig(
-            autoSizeMode: TrinaAutoSizeMode.scale,
-          ),
-          enableMoveHorizontalInEditing: true,
-          style: TrinaGridStyleConfig(
-            rowHeight: tableRowHeight,
-            cellDirtyColor: AppColors.dirtyCell,
-            cellTextStyle: _cellTextStyle(context),
-            gridBorderColor: context.colorScheme.surfaceDim,
-            borderColor: context.colorScheme.surfaceDim,
-            enableColumnBorderHorizontal: false,
-            enableCellBorderHorizontal: false,
-            enableColumnBorderVertical: false,
-          ),
-          scrollbar: TrinaGridScrollbarConfig(
-            showHorizontal: false,
-            showVertical: false,
-          ),
-        ),
-        columns: columns,
-        rows: [],
-        onChanged: (event) => _updateControllerLines(),
-        onLoaded: (event) {
-          stateManager = event.stateManager;
+      child: Builder(
+        builder: (context) {
+          return TrinaGrid(
+            configuration: TrinaGridConfiguration(
+              enterKeyAction: TrinaGridEnterKeyAction.editingAndMoveRight,
+              columnSize: TrinaGridColumnSizeConfig(
+                autoSizeMode: TrinaAutoSizeMode.scale,
+              ),
+              enableMoveHorizontalInEditing: true,
+              style: TrinaGridStyleConfig(
+                rowHeight: tableRowHeight,
+                cellDirtyColor: AppColors.dirtyCell,
+                cellTextStyle: _cellTextStyle(context),
+                gridBorderColor: context.colorScheme.surfaceDim,
+                borderColor: context.colorScheme.surfaceDim,
+                enableColumnBorderHorizontal: false,
+                enableCellBorderHorizontal: false,
+                enableColumnBorderVertical: false,
+              ),
+              scrollbar: TrinaGridScrollbarConfig(
+                showHorizontal: false,
+                showVertical: false,
+              ),
+            ),
+            columns: columns,
+            rows: [],
+            onChanged: (event) => _updateControllerLines(),
+            onLoaded: (event) {
+              stateManager = event.stateManager;
 
-          if (widget.controller.editingIsEnabled || discount > 0) {
-            stateManager.columnFooterHeight = footerExpandedHeight;
-          }
-          _editingListener = () {
-            final isEditing = widget.controller.editingIsEnabled;
-            stateManager.hideColumn(columns.last, !isEditing);
-            if (isEditing) {
-              onEnableEditing();
-            } else {
-              onDisableEditing();
-            }
-          };
-          widget.controller.enableEditingNotifier.addListener(
-            _editingListener!,
+              if (widget.controller.editingIsEnabled || discount > 0) {
+                stateManager.columnFooterHeight = footerExpandedHeight;
+              }
+              _editingListener = () {
+                final isEditing = widget.controller.editingIsEnabled;
+                stateManager.hideColumn(columns.last, !isEditing);
+                if (isEditing) {
+                  onEnableEditing();
+                } else {
+                  onDisableEditing();
+                }
+              };
+              widget.controller.enableEditingNotifier.addListener(
+                _editingListener!,
+              );
+
+              stateManager.setShowColumnFilter(false);
+            },
           );
-
-          stateManager.setShowColumnFilter(false);
         },
       ),
     );

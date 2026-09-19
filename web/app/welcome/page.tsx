@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 
-// Distributor landing for invite + recovery links (WEB_WELCOME_URL).
+// Customer landing for invite + recovery links (WEB_WELCOME_URL).
 // The link carries ?code=… → exchange for a session → set own password.
 // No secret ever travels in chat history (Phase 7).
 function WelcomeForm() {
@@ -91,7 +91,7 @@ function WelcomeForm() {
           }}
         />
       </label>
-      {error ? <p style={{ color: "#dc2626" }}>{error}</p> : null}
+      {error ? <p className="error">{error}</p> : null}
       <button
         className="btn btn-primary"
         disabled={busy || password.length < 6}

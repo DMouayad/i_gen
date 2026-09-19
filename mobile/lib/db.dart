@@ -48,6 +48,7 @@ class DbConstants {
   static const String columnInvoiceTotal = 'total';
   static const String columnInvoiceCurrency = 'currency';
   static const String columnInvoiceDiscount = 'discount';
+  static const String columnInvoiceOrderId = 'order_id';
 
   //
   static const String tableInvoiceLines = 'invoice_lines';
@@ -145,7 +146,7 @@ class DbConstants {
 }
 
 class DbProvider {
-  static const int dbVersion = 4;
+  static const int dbVersion = 5;
 
   /// Name of the live sqlite file. Single source of truth — `injectDependencies`
   /// (`mobile/lib/di.dart`) and the backup flow (`mobile/lib/utils/backup_flow.dart`) both
@@ -161,6 +162,7 @@ class DbProvider {
         await applyV2Migration(db);
         await applyV3Migration(db);
         await applyV4Migration(db);
+        await applyV5Migration(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
@@ -171,6 +173,9 @@ class DbProvider {
         }
         if (oldVersion < 4) {
           await applyV4Migration(db);
+        }
+        if (oldVersion < 5) {
+          await applyV5Migration(db);
         }
       },
     );
@@ -363,6 +368,19 @@ FROM ${DbConstants.tableInvoiceLine}
     await db.execute(
       'ALTER TABLE ${DbConstants.tableInvoiceLine}_new '
       'RENAME TO ${DbConstants.tableInvoiceLine}',
+    );
+  }
+
+  /// Version 5 migration: invoice origin. Additive only — one nullable
+  /// column; existing invoices simply have no order (`NULL`). The sync
+  /// engine maps the column by name in both directions (unknown keys are
+  /// skipped on old devices), and the server needs the matching nullable
+  /// `order_id uuid REFERENCES orders(id)` — run that SQL before releasing
+  /// any app version that writes the column.
+  static Future<void> applyV5Migration(Database db) async {
+    await db.execute(
+      'ALTER TABLE ${DbConstants.tableInvoice} '
+      'ADD COLUMN ${DbConstants.columnInvoiceOrderId} TEXT',
     );
   }
 }

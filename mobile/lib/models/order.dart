@@ -9,6 +9,8 @@ class OrderItem {
     required this.productId,
     required this.amount,
     required this.price,
+    this.productModel,
+    this.size = '',
   });
 
   static OrderItem? fromMap(Map<String, dynamic> map) {
@@ -24,6 +26,15 @@ class OrderItem {
         productId: map['product_id']?.toString(),
         amount: amount,
         price: price.toDouble(),
+        // PostgREST embed (`products(model)`): absent when the join is
+        // denied or the product was deleted — the dialog falls back to id.
+        productModel: switch (map['products']) {
+          {'model': String model} => model,
+          _ => null,
+        },
+        // Mirrors invoice_lines.size ('' = sizeless); ignored keys stay
+        // ignored, so older rows without it still parse.
+        size: map['size']?.toString() ?? '',
       );
     }
     return null;
@@ -34,12 +45,14 @@ class OrderItem {
   final String? productId;
   final int amount;
   final double price;
+  final String? productModel;
+  final String size;
 }
 
 class Order {
   const Order({
     required this.id,
-    required this.distributorId,
+    required this.customerId,
     required this.status,
     required this.total,
     required this.currency,
@@ -53,14 +66,14 @@ class Order {
   }) {
     if (map case {
       'id': String id,
-      'distributor_id': String distributorId,
+      'customer_id': String customerId,
       'status': String status,
       'total': num total,
       'currency': String currency,
     }) {
       return Order(
         id: id,
-        distributorId: distributorId,
+        customerId: customerId,
         status: status,
         total: total.toDouble(),
         currency: currency,
@@ -72,7 +85,7 @@ class Order {
   }
 
   final String id;
-  final String distributorId;
+  final String customerId;
   final String status;
   final double total;
   final String currency;
@@ -80,24 +93,24 @@ class Order {
   final List<OrderItem> items;
 }
 
-/// Narrow distributor projection for the staff directory (names + phone +
+/// Narrow customer projection for the staff directory (names + phone +
 /// order linkage only — no credential details).
-class Distributor {
-  const Distributor({
+class Customer {
+  const Customer({
     required this.id,
     required this.nameAr,
     required this.nameEn,
     required this.phone,
   });
 
-  static Distributor? fromMap(Map<String, dynamic> map) {
+  static Customer? fromMap(Map<String, dynamic> map) {
     if (map case {
       'id': String id,
       'name_ar': String nameAr,
       'name_en': String nameEn,
       'phone': String phone,
     }) {
-      return Distributor(id: id, nameAr: nameAr, nameEn: nameEn, phone: phone);
+      return Customer(id: id, nameAr: nameAr, nameEn: nameEn, phone: phone);
     }
     return null;
   }

@@ -30,6 +30,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addItem => 'إضافة صنف';
 
   @override
+  String get createInvoiceBtn => 'إنشاء فاتورة';
+
+  @override
   String get sortLabel => 'فرز';
 
   @override
@@ -170,11 +173,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get ordersSignInPrompt => 'سجّل الدخول من الإعدادات لعرض الطلبات.';
 
   @override
-  String get ordersDistributorGuidance =>
-      'يقوم الموزّعون بتقديم ومتابعة الطلبات في تطبيق الويب — افتح رابط الترحيب للمتابعة هناك.';
+  String get ordersCustomerGuidance =>
+      'يقوم العملاء بتقديم ومتابعة الطلبات في تطبيق الويب — افتح رابط الترحيب للمتابعة هناك.';
 
   @override
-  String get distributors => 'الموزّعون';
+  String get customers => 'العملاء';
 
   @override
   String get noConnectionOrders => 'لا يوجد اتصال — اتصل لعرض الطلبات الحية.';
@@ -194,15 +197,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noOrdersYet => 'لا توجد طلبات بعد.';
 
   @override
-  String orderAmountTitle(String total, String currency) {
-    return '$total $currency';
-  }
-
-  @override
   String get newOrderChannelName => 'طلبات جديدة';
 
   @override
-  String get newOrderChannelDescription => 'تنبيهات عند تقديم موزع لطلب.';
+  String get newOrderChannelDescription => 'تنبيهات عند تقديم عميل لطلب.';
 
   @override
   String get newOrderTitle => 'طلب جديد';
@@ -224,16 +222,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get orderStatusPending => 'قيد الانتظار';
 
   @override
-  String get orderStatusConfirmed => 'مؤكد';
-
-  @override
-  String get orderStatusDelivered => 'تم التسليم';
-
-  @override
-  String get orderStatusCancelled => 'ملغي';
-
-  @override
-  String get noConnectionShort => 'لا يوجد اتصال.';
+  String get orderStatusCompleted => 'مكتمل';
 
   @override
   String unexpectedError(String error) {
@@ -241,32 +230,35 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String orderDetailTitle(String status) {
-    return 'طلب · $status';
-  }
-
-  @override
   String get orderNoLines => 'لا توجد أصناف في هذا الطلب.';
 
   @override
-  String orderItemAmount(String amount) {
-    return '×$amount';
+  String get orderInvoiced => 'تمت الفوترة';
+
+  @override
+  String get createInvoice => 'إنشاء فاتورة';
+
+  @override
+  String get goToInvoice => 'الذهاب إلى الفاتورة';
+
+  @override
+  String orderSkippedLines(int count) {
+    return 'تم تخطي $count أصناف (المنتج غير موجود)';
   }
 
   @override
   String get close => 'إغلاق';
 
   @override
-  String get noConnectionDistributors => 'لا يوجد اتصال — اتصل لعرض الموزّعين.';
+  String get noConnectionCustomers => 'لا يوجد اتصال — اتصل لعرض العملاء.';
 
   @override
-  String couldNotLoadDistributors(String error) {
-    return 'تعذّر تحميل الموزّعين: $error';
+  String couldNotLoadCustomers(String error) {
+    return 'تعذّر تحميل العملاء: $error';
   }
 
   @override
-  String get noDistributorsYet =>
-      'لا يوجد موزّعون بعد — ادعُ أحدهم من الإعدادات.';
+  String get noCustomersYet => 'لا يوجد عملاء بعد — ادعُ واحداً من الإعدادات.';
 
   @override
   String get productIdColumn => 'المعرّف';
@@ -398,7 +390,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get roleEmployee => 'موظف';
 
   @override
-  String get roleDistributor => 'موزّع';
+  String get roleCustomer => 'عميل';
 
   @override
   String get inviteActionLabel => 'الإجراء';

@@ -20,10 +20,16 @@ class InvoiceDetailsMobile extends StatefulWidget {
     super.key,
     required this.controller,
     this.onSaved,
+    this.orderSkipped = 0,
   });
 
   final InvoiceDetailsController controller;
   final void Function(Invoice invoice)? onSaved;
+
+  /// Order lines that could not be matched to catalog products when this
+  /// invoice was prefilled from an order. Reported on-screen (not on the
+  /// covered orders route) so the drop is never silent.
+  final int orderSkipped;
 
   @override
   State<InvoiceDetailsMobile> createState() => _InvoiceDetailsMobileState();
@@ -39,6 +45,16 @@ class _InvoiceDetailsMobileState extends State<InvoiceDetailsMobile> {
     controller.loadPricing().then((_) {
       if (mounted) setState(() {});
     });
+    if (widget.orderSkipped > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.orderSkippedLines(widget.orderSkipped)),
+          ),
+        );
+      });
+    }
   }
 
   Future<bool> _onSave(BuildContext context) async {

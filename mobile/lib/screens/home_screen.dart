@@ -89,6 +89,11 @@ class _HomeState extends State<Home> {
   }
 
   NavListener? navListener;
+
+  /// Bumped when returning from the invoice editor so ArchiveScreen remounts
+  /// and reloads (see _onCreateNew).
+  int _archiveVersion = 0;
+
   @override
   void dispose() {
     unsavedProductPricingCountNotifier.dispose();
@@ -98,9 +103,9 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  void _onCreateNew() {
+  void _onCreateNew() async {
     currentInvoiceDetailsController = InvoiceDetailsController(null);
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) {
           return context.isMobile
@@ -113,6 +118,11 @@ class _HomeState extends State<Home> {
         },
       ),
     );
+    // The archive list loads once in initState and its State survives the
+    // pop above, so a saved invoice would stay invisible until the next
+    // manual refresh. Remount to reload (cheap local read; newest-first
+    // puts the new invoice on top, so losing scroll position is fine).
+    if (mounted) setState(() => _archiveVersion++);
   }
 
   @override
@@ -187,7 +197,7 @@ class _HomeState extends State<Home> {
                         ),
                         onPressed: _onCreateNew,
                         icon: const Icon(Icons.add),
-                        label: Text(context.l10n.addItem),
+                        label: Text(context.l10n.createInvoiceBtn),
                       ),
                     ),
                     backgroundColor: context.colorScheme.surface,
@@ -243,6 +253,7 @@ class _HomeState extends State<Home> {
                     child: switch (navListener!.value) {
                       0 => Center(
                         child: ArchiveScreen(
+                          key: ValueKey(_archiveVersion),
                           onLoaded: (invoiceController) =>
                               currentInvoiceDetailsController =
                                   invoiceController,

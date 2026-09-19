@@ -11,7 +11,7 @@ import {
 import { getSupabase, supabaseConfigured } from "./supabase";
 
 export class NoAccountError extends Error {}
-export class NotDistributorError extends Error {}
+export class NotCustomerError extends Error {}
 
 interface AuthState {
   userId: string | null;
@@ -81,9 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw error;
     const r = roleOf(data.user);
-    if (r !== null && r !== "distributor") {
+    if (r !== null && r !== "customer") {
       await sb.auth.signOut();
-      throw new NotDistributorError(r);
+      throw new NotCustomerError(r);
     }
   }, []);
 

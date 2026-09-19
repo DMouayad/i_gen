@@ -43,9 +43,20 @@ flutter:
     generate: true
     uses-material-design: true
     fonts:
+        - family: Readex Pro
+          fonts:
+              - asset: assets/ReadexPro-VariableFont_wght.ttf
         - family: Noto Naskh Arabic
           fonts:
               - asset: assets/NotoNaskhArabic-VariableFont_wght.ttf
+        - family: IBM Plex Sans Arabic
+          fonts:
+              - asset: assets/IBMPlexSansArabic-Regular.ttf
+                weight: 400
+              - asset: assets/IBMPlexSansArabic-Medium.ttf
+                weight: 500
+              - asset: assets/IBMPlexSansArabic-SemiBold.ttf
+                weight: 600
     assets:
         - assets/
 

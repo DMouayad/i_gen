@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
 import StatusBadge from "@/app/status-badge";
 import { useAuth } from "@/lib/auth";
+import { fmtDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 import { parseOrder, type OrderItemRow, type OrderRow } from "@/lib/types";
@@ -46,12 +48,14 @@ export default function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { userId, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [order, setOrder] = useState<OrderRow | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState<Record<string, number>>({});
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -82,6 +86,7 @@ export default function OrderDetailPage({
           .filter((l): l is Line => l !== null),
       );
       setEditing(false);
+      setConfirming(false);
       setRemoved(new Set());
       setState("ready");
     } catch {
@@ -102,8 +107,7 @@ export default function OrderDetailPage({
     setEditing(true);
   };
 
-  const save = async () => {
-    if (!order || busy) return;
+  const save = async () => {    if (!order || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -130,20 +134,23 @@ export default function OrderDetailPage({
     }
   };
 
-  const cancelOrder = async () => {
+  // No hard delete by design (customers hold no DELETE grant): deleting a
+  // pending order is a soft-delete flag, which the own-pending UPDATE policy
+  // allows. Two taps — arm, then confirm.
+  const removeOrder = async () => {
     if (!order || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await getSupabase()
+      const { error } = await getSupabase()
         .from("orders")
-        .update({ status: "cancelled" })
-        .eq("id", order.id)
-        .throwOnError();
-      await fetchAll();
+        .update({ is_deleted: true })
+        .eq("id", order.id);
+      if (error) throw error;
+      router.push("/orders");
     } catch {
       setError(t.unknownError);
-    } finally {
+      setConfirming(false);
       setBusy(false);
     }
   };
@@ -186,12 +193,10 @@ export default function OrderDetailPage({
             <StatusBadge status={order.status} />
           </span>
         </div>
-        <div className="font-bold">
-          {order.total > 0
-            ? `${order.total} ${order.currency}`
-            : t.totalPending}
+        <div className="muted text-sm">
+          {t.placedOn} {fmtDate(order.created_at, lang)}
         </div>
-      </div>
+        </div>
 
       <div className="card flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -199,57 +204,108 @@ export default function OrderDetailPage({
             {t.orderLines} · {visible.length}
           </h2>
           {editable && !editing ? (
-            <button
-              className="btn btn-ghost !px-3 !py-1 text-sm ms-auto"
-              onClick={startEdit}
-            >
-              {t.editOrder}
-            </button>
+            <span className="ms-auto flex items-center gap-2">
+              {!confirming ? (
+                <button
+                  className="btn btn-danger !px-3 !py-1 text-sm"
+                  disabled={busy}
+                  onClick={() => setConfirming(true)}
+                >
+                  {t.deleteOrder}
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn btn-danger !px-3 !py-1 text-sm"
+                    disabled={busy}
+                    onClick={() => void removeOrder()}
+                  >
+                    {busy ? t.deleting : t.confirmDelete}
+                  </button>
+                  <button
+                    className="btn btn-ghost !px-3 !py-1 text-sm"
+                    disabled={busy}
+                    onClick={() => setConfirming(false)}
+                  >
+                    {t.close}
+                  </button>
+                </>
+              )}
+              <button
+                className="btn btn-ghost !px-3 !py-1 text-sm"
+                onClick={startEdit}
+              >
+                {t.editOrder}
+              </button>
+            </span>
           ) : null}
         </div>
-        {visible.map((l) => (
-          <div key={l.id} className="flex items-center gap-2 text-sm">
-            <span className="flex-1">
-              {l.name || l.model}
-              {l.size ? ` (${l.size})` : ""} ×{" "}
-              {editing ? (draft[l.id] ?? l.amount) : l.amount}
-            </span>
-            {editing ? (
-              <>
-                <button
-                  className="btn btn-ghost !px-2 !py-0.5"
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      [l.id]: Math.max(1, (d[l.id] ?? l.amount) - 1),
-                    }))
-                  }
-                >
-                  −
-                </button>
-                <button
-                  className="btn btn-ghost !px-2 !py-0.5"
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      [l.id]: Math.min(999, (d[l.id] ?? l.amount) + 1),
-                    }))
-                  }
-                >
-                  +
-                </button>
-                <button
-                  className="btn btn-ghost !px-2 !py-0.5"
-                  onClick={() =>
-                    setRemoved((s) => new Set(s).add(l.id))
-                  }
-                >
-                  {t.remove}
-                </button>
-              </>
-            ) : null}
-          </div>
-        ))}
+        <div className="table-scroll">
+        <table className="order-table">
+          <thead>
+            <tr>
+              <th>{t.item}</th>
+              <th>{t.sizes}</th>
+              <th>{t.qty}</th>
+              {editing ? <th /> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((l) => (
+              <tr key={l.id}>
+                <td>
+                  <div className="font-semibold">{l.model || l.name}</div>
+                  {l.model && l.name ? (
+                    <div className="muted text-sm">{l.name}</div>
+                  ) : null}
+                </td>
+                <td>{l.size === "" ? "—" : l.size}</td>
+                <td className="font-bold">
+                  × {editing ? (draft[l.id] ?? l.amount) : l.amount}
+                </td>
+                {editing ? (
+                  <td>
+                    <div className="flex items-center gap-1">
+                      <button
+                        className="btn btn-ghost !px-2 !py-0.5"
+                        aria-label={`${t.decrease}: ${l.model || l.name} ${l.size}`}
+                        onClick={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            [l.id]: Math.max(1, (d[l.id] ?? l.amount) - 1),
+                          }))
+                        }
+                      >
+                        −
+                      </button>
+                      <button
+                        className="btn btn-ghost !px-2 !py-0.5"
+                        aria-label={`${t.increase}: ${l.model || l.name} ${l.size}`}
+                        onClick={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            [l.id]: Math.min(999, (d[l.id] ?? l.amount) + 1),
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                      <button
+                        className="btn btn-ghost !px-2 !py-0.5"
+                        onClick={() =>
+                          setRemoved((s) => new Set(s).add(l.id))
+                        }
+                      >
+                        {t.remove}
+                      </button>
+                    </div>
+                  </td>
+                ) : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        </div>
         {editing ? (
           <div className="flex gap-2 mt-2">
             <button
@@ -268,18 +324,8 @@ export default function OrderDetailPage({
             </button>
           </div>
         ) : null}
-        {error ? <p style={{ color: "#dc2626" }}>{error}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
       </div>
-
-      {editable && !editing ? (
-        <button
-          className="btn btn-ghost"
-          disabled={busy}
-          onClick={() => void cancelOrder()}
-        >
-          {busy ? t.cancelling : t.cancelOrder}
-        </button>
-      ) : null}
     </div>
   );
 }

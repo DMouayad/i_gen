@@ -5,19 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import StatusBadge from "@/app/status-badge";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
+import { fmtDate } from "@/lib/format";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 import { parseOrder, type OrderRow } from "@/lib/types";
-
-function fmtDate(iso: string | null, lang: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(lang === "ar" ? "ar" : "en", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export default function OrdersPage() {
   const { t, lang } = useI18n();
@@ -79,6 +69,7 @@ export default function OrdersPage() {
 
   return (
     <div className="flex flex-col gap-2">
+      <h1 className="sr-only">{t.orders}</h1>
       {orders.map((o) => (
         <Link key={o.id} href={`/orders/${o.id}`} className="card">
           <div className="flex items-center gap-2 flex-wrap">
@@ -88,9 +79,6 @@ export default function OrdersPage() {
             <span className="ms-auto">
               <StatusBadge status={o.status} />
             </span>
-          </div>
-          <div className="mt-1 font-bold">
-            {o.total > 0 ? `${o.total} ${o.currency}` : t.totalPending}
           </div>
         </Link>
       ))}

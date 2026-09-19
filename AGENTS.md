@@ -3,6 +3,7 @@
 ## Layout
 
 - **The Flutter app lives in `mobile/`.** Run `flutter` commands with workdir `mobile/`; app paths below are relative to it (`mobile/lib/…`). Repo-level dirs (`specs/`, `supabase/`) stay at root.
+- **Design tokens live in `design/design-tokens.json`.** Single source for the web + mobile design language — mirror values into `web/app/tokens.css` / `mobile/lib/design/tokens.dart`, never invent palette values inline.
 - **The distributor web app lives in `web/`** (Next.js 16, Vercel root = `web/`). Run `pnpm` commands with workdir `web/`. Same Supabase project as mobile; `supabase/schema.sql` is the shared server contract for both.
 
 ## Web workflow

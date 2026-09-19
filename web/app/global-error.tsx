@@ -4,7 +4,7 @@ import "./globals.css";
 
 // Replaces the root layout when a client exception escapes: shows the real
 // error (message + digest) instead of the generic "couldn't load" page, so a
-// distributor can report exactly what broke. Static EN/AR copy — providers
+// customer can report exactly what broke. Static EN/AR copy — providers
 // from the root layout are not mounted here.
 export default function GlobalError({
   error,

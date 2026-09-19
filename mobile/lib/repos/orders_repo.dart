@@ -34,31 +34,49 @@ class OrdersRepo {
     }
   }
 
-  /// Newest orders first. Throws [SocketException] offline so callers can
-  /// show the retry state.
+  /// Newest orders first, with lines + product models embedded so the list
+  /// can summarize each order in one round trip (no N+1 detail fetches).
+  /// Throws [SocketException] offline so callers can show the retry state.
   Future<List<Order>> getOrders() async {
     final client = _client;
     if (client == null) throw const SocketException('Sync not configured');
     final rows = await client
         .from('orders')
-        .select()
+        .select('*, order_items(*, products(model))')
         .eq('is_deleted', false)
         .order('created_at', ascending: false)
         .limit(200);
     final orders = <Order>[];
     for (final row in (rows as List)) {
-      final order = Order.fromMap(Map<String, dynamic>.from(row as Map));
+      final map = Map<String, dynamic>.from(row as Map);
+      final order = Order.fromMap(map, items: _parseItems(map['order_items']));
       if (order != null) orders.add(order);
     }
     return orders;
   }
 
+  static List<OrderItem> _parseItems(Object? embedded) {
+    final items = <OrderItem>[];
+    for (final row in (embedded as List?) ?? const []) {
+      final item = OrderItem.fromMap(Map<String, dynamic>.from(row as Map));
+      if (item != null) items.add(item);
+    }
+    return items;
+  }
+
+  /// Lines with the product model embedded (`products(model)` via the
+  /// `product_id` FK) so the details table can name each line. Staff can
+  /// read the catalog, so the join is permitted; a missing embed degrades
+  /// to a null model, never to a dropped line.
+  /// Per-order refresh fallback (the list query embeds lines, so the dialog
+  /// normally needs no second fetch). Kept deliberately: the embedded list
+  /// is capped at 200 orders and goes stale — do not "clean up".
   Future<List<OrderItem>> getOrderItems(String orderId) async {
     final client = _client;
     if (client == null) throw const SocketException('Sync not configured');
     final rows = await client
         .from('order_items')
-        .select()
+        .select('*, products(model)')
         .eq('order_id', orderId);
     final items = <OrderItem>[];
     for (final row in (rows as List)) {
@@ -68,24 +86,24 @@ class OrdersRepo {
     return items;
   }
 
-  /// Staff directory: distributors only, alphabetical by English name.
-  Future<List<Distributor>> getDistributors() async {
+  /// Staff directory: customers only, alphabetical by English name.
+  Future<List<Customer>> getCustomers() async {
     final client = _client;
     if (client == null) throw const SocketException('Sync not configured');
     try {
       final rows = await client
           .from('profiles')
           .select('id, name_ar, name_en, phone')
-          .eq('role', 'distributor')
+          .eq('role', 'customer')
           .order('name_en');
-      final out = <Distributor>[];
+      final out = <Customer>[];
       for (final row in (rows as List)) {
-        final d = Distributor.fromMap(Map<String, dynamic>.from(row as Map));
+        final d = Customer.fromMap(Map<String, dynamic>.from(row as Map));
         if (d != null) out.add(d);
       }
       return out;
     } catch (e) {
-      debugPrint('OrdersRepo: distributors read failed: $e');
+      debugPrint('OrdersRepo: customers read failed: $e');
       rethrow;
     }
   }

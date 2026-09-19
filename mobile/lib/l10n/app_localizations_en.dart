@@ -30,6 +30,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addItem => 'Add Item';
 
   @override
+  String get createInvoiceBtn => 'Create invoice';
+
+  @override
   String get sortLabel => 'SORT';
 
   @override
@@ -170,11 +173,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ordersSignInPrompt => 'Sign in from Settings to view orders.';
 
   @override
-  String get ordersDistributorGuidance =>
-      'Distributors place and follow orders in the web app — open your welcome link to continue there.';
+  String get ordersCustomerGuidance =>
+      'Customers place and follow orders in the web app — open your welcome link to continue there.';
 
   @override
-  String get distributors => 'Distributors';
+  String get customers => 'Customers';
 
   @override
   String get noConnectionOrders =>
@@ -195,16 +198,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noOrdersYet => 'No orders yet.';
 
   @override
-  String orderAmountTitle(String total, String currency) {
-    return '$total $currency';
-  }
-
-  @override
   String get newOrderChannelName => 'New orders';
 
   @override
   String get newOrderChannelDescription =>
-      'Alerts when a distributor places an order.';
+      'Alerts when a customer places an order.';
 
   @override
   String get newOrderTitle => 'New order';
@@ -226,16 +224,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orderStatusPending => 'pending';
 
   @override
-  String get orderStatusConfirmed => 'confirmed';
-
-  @override
-  String get orderStatusDelivered => 'delivered';
-
-  @override
-  String get orderStatusCancelled => 'cancelled';
-
-  @override
-  String get noConnectionShort => 'No connection.';
+  String get orderStatusCompleted => 'completed';
 
   @override
   String unexpectedError(String error) {
@@ -243,33 +232,36 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String orderDetailTitle(String status) {
-    return 'Order · $status';
-  }
-
-  @override
   String get orderNoLines => 'No lines on this order.';
 
   @override
-  String orderItemAmount(String amount) {
-    return '×$amount';
+  String get orderInvoiced => 'Invoiced';
+
+  @override
+  String get createInvoice => 'Create invoice';
+
+  @override
+  String get goToInvoice => 'Go to invoice';
+
+  @override
+  String orderSkippedLines(int count) {
+    return '$count lines skipped (product missing)';
   }
 
   @override
   String get close => 'Close';
 
   @override
-  String get noConnectionDistributors =>
-      'No connection — connect to view distributors.';
+  String get noConnectionCustomers =>
+      'No connection — connect to view customers.';
 
   @override
-  String couldNotLoadDistributors(String error) {
-    return 'Could not load distributors: $error';
+  String couldNotLoadCustomers(String error) {
+    return 'Could not load customers: $error';
   }
 
   @override
-  String get noDistributorsYet =>
-      'No distributors yet — invite one from Settings.';
+  String get noCustomersYet => 'No customers yet — invite one from Settings.';
 
   @override
   String get productIdColumn => 'ID';
@@ -401,7 +393,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleEmployee => 'Employee';
 
   @override
-  String get roleDistributor => 'Distributor';
+  String get roleCustomer => 'Customer';
 
   @override
   String get inviteActionLabel => 'Action';

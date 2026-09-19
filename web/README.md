@@ -1,8 +1,8 @@
-# Distributor web app (Next.js 16)
+# Customer web app (Next.js 16)
 
-Distributor-only: catalog + cart, order history, pending-order edit. EN/AR,
+Customer-only: catalog + cart, order history, pending-order edit. EN/AR,
 no prices surface. See the root `README.md` and
-`specs/phase-12-distributor-web.md`.
+`specs/phase-12-customer-web.md`.
 
 ```sh
 cp .env.example .env.local  # Supabase URL + anon key

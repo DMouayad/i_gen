@@ -129,7 +129,7 @@ class SupabaseGateway implements RemoteGateway {
     required int? lastPullAtMillis,
   }) async {
     // Company-visible reads: the RLS policies are the lock (staff share all
-    // business rows, distributors see none of the catalog), so the client
+    // business rows, customers see none of the catalog), so the client
     // must NOT narrow to owner_id — that filter hid other users' catalog
     // rows and starved multi-user devices. [ownerId] is still required
     // (login-gated reads) but only audit from here on.

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'package:gal/gal.dart';
+import 'package:i_gen/design/tokens.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -26,9 +27,13 @@ class InvoiceDetails extends StatefulWidget {
     super.key,
     required this.invoiceController,
     this.onSaved,
+    this.orderSkipped = 0,
   });
   final InvoiceDetailsController invoiceController;
   final void Function(Invoice newInvoice)? onSaved;
+
+  /// See [InvoiceDetailsMobile.orderSkipped].
+  final int orderSkipped;
 
   @override
   State<InvoiceDetails> createState() => _InvoiceDetailsState();
@@ -37,6 +42,21 @@ class InvoiceDetails extends StatefulWidget {
 class _InvoiceDetailsState extends State<InvoiceDetails> {
   GlobalKey globalKey = GlobalKey();
   bool _isCapturing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.orderSkipped > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.orderSkippedLines(widget.orderSkipped)),
+          ),
+        );
+      });
+    }
+  }
 
   Future<void> _save() async {
     await widget.invoiceController.saveToDB();
@@ -358,7 +378,13 @@ class _InvoiceDetailsState extends State<InvoiceDetails> {
             ),
             // Editing uses the table on desktop and the grid on mobile;
             // the paper above is preview/print only.
-            body: Center(child: bodyContent),
+            body: DefaultTextStyle(
+              style: TextStyle(
+                fontFamily: BrandFonts.arabic,
+                fontFamilyFallback: const [],
+              ),
+              child: Center(child: bodyContent),
+            ),
           );
         },
       ),
@@ -389,7 +415,8 @@ class _Header extends StatelessWidget {
                 context.l10n.invoiceTitle,
                 textAlign: TextAlign.end,
                 style: context.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  color: context.colorScheme.onSurfaceVariant,
+                  fontFamily: BrandFonts.arabic,
                 ),
               ),
               SizedBox(height: AppGaps.sm),
@@ -409,8 +436,9 @@ class _Header extends StatelessWidget {
                   builder: (context, value, _) {
                     return Text(
                       controller.getDate(),
-                      style: context.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      style: context.textTheme.titleMedium?.copyWith(
+                        fontFamily: BrandFonts.arabic,
+                        fontWeight: .w600,
                       ),
                     );
                   },

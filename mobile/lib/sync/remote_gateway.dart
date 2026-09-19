@@ -82,7 +82,7 @@ abstract class RemoteGateway {
 
   /// Company-visible server rows with `updated_at > [lastPullAtMillis]`
   /// (null = full pull). Ordered ascending by `updated_at` when possible.
-  /// RLS is the visibility lock (staff share the catalog, distributors get
+  /// RLS is the visibility lock (staff share the catalog, customers get
   /// none of it); the gateway must NOT narrow to one owner, or multi-user
   /// devices starve. [ownerId] gates login, audit only beyond that.
   Future<List<Map<String, dynamic>>> pullTable({

@@ -22,6 +22,7 @@ class InvoiceRepo {
     required List<InvoiceTableRow> lines,
     required double discount,
     int? invoiceId,
+    String? orderId,
   }) async {
     int? id = invoiceId;
     return await db.transaction((txn) async {
@@ -40,6 +41,17 @@ class InvoiceRepo {
           whereArgs: [invoiceId],
         );
         id = invoiceId;
+        // Origin is write-once (never in `values` above): re-read so the
+        // returned invoice carries the stored one.
+        final origin = await txn.query(
+          DbConstants.tableInvoice,
+          columns: [DbConstants.columnInvoiceOrderId],
+          where: '${DbConstants.columnId} = ?',
+          whereArgs: [invoiceId],
+          limit: 1,
+        );
+        orderId = origin.firstOrNull?[DbConstants.columnInvoiceOrderId]
+            ?.toString();
         await SyncMetadata.recordMutation(
           txn,
           ref: MutationRef(
@@ -49,14 +61,19 @@ class InvoiceRepo {
           ),
         );
       } else {
-        final values =
-            await SyncMetadata.withStamp(txn, DbConstants.tableInvoice, {
-              DbConstants.columnInvoiceDate: date.toIso8601String(),
-              DbConstants.columnCustomerName: customerName,
-              DbConstants.columnInvoiceTotal: total,
-              DbConstants.columnInvoiceCurrency: currency,
-              DbConstants.columnInvoiceDiscount: discount,
-            });
+        final values = await SyncMetadata.withStamp(
+          txn,
+          DbConstants.tableInvoice,
+          {
+            DbConstants.columnInvoiceDate: date.toIso8601String(),
+            DbConstants.columnCustomerName: customerName,
+            DbConstants.columnInvoiceTotal: total,
+            DbConstants.columnInvoiceCurrency: currency,
+            DbConstants.columnInvoiceDiscount: discount,
+            // Origin is set once at creation and never rewritten above.
+            DbConstants.columnInvoiceOrderId: orderId,
+          },
+        );
         id = await txn.insert(DbConstants.tableInvoice, values);
         await SyncMetadata.recordMutation(
           txn,
@@ -164,6 +181,7 @@ class InvoiceRepo {
             )
             .toList(),
         discount: discount,
+        orderId: orderId,
       );
     });
   }
@@ -188,6 +206,34 @@ and ($lineFilter)
 where ($invoiceFilter)
 ${orderBy != null ? ' ORDER BY ${orderBy.field} ${orderBy.isAscending ? " asc" : " desc"}' : ''}
 ''');
+    return _mergeRows(result);
+  }
+
+  /// Single invoice with lines, or null when missing/soft-deleted.
+  Future<Invoice?> getInvoiceById(int id) async {
+    final invoiceFilter = await SyncMetadata.notDeletedClause(
+      db,
+      DbConstants.tableInvoice,
+      alias: DbConstants.tableInvoice,
+    );
+    final lineFilter = await SyncMetadata.notDeletedClause(
+      db,
+      DbConstants.tableInvoiceLine,
+      alias: DbConstants.tableInvoiceLine,
+    );
+    final result = await db.rawQuery(
+      '''
+select invoice.*, product_id, amount, price, ${DbConstants.tableInvoiceLine}.${DbConstants.columnInvoiceLineSize} as size from invoice left join invoice_line on invoice._id = invoice_line.invoice_id
+and ($lineFilter)
+where ($invoiceFilter) and invoice.${DbConstants.columnId} = ?
+''',
+      [id],
+    );
+    final merged = _mergeRows(result);
+    return merged.isEmpty ? null : merged.first;
+  }
+
+  List<Invoice> _mergeRows(List<Map<String, Object?>> result) {
     Map<int, Invoice> invoices = {};
     for (var row in result) {
       var invoice = Invoice.fromMap(row);
@@ -217,6 +263,51 @@ ${orderBy != null ? ' ORDER BY ${orderBy.field} ${orderBy.isAscending ? " asc" :
       }
     }
     return invoices.values.toList();
+  }
+
+  /// Server order uuid → local invoice id for orders that already have an
+  /// invoice (for the orders list marker + "go to invoice"). Soft-deleted
+  /// invoices don't count; if an order ever links several, the newest wins.
+  Future<Map<String, int>> getOrderInvoiceMap() async {
+    final filter = await SyncMetadata.notDeletedClause(
+      db,
+      DbConstants.tableInvoice,
+    );
+    final rows = await db.query(
+      DbConstants.tableInvoice,
+      columns: [DbConstants.columnId, DbConstants.columnInvoiceOrderId],
+      where: '${DbConstants.columnInvoiceOrderId} IS NOT NULL AND ($filter)',
+      orderBy: '${DbConstants.columnId} DESC',
+    );
+    final map = <String, int>{};
+    for (final row in rows) {
+      final orderUuid = row[DbConstants.columnInvoiceOrderId]?.toString();
+      final id = row[DbConstants.columnId] as int?;
+      if (orderUuid != null && orderUuid.isNotEmpty && id != null) {
+        map.putIfAbsent(orderUuid, () => id);
+      }
+    }
+    return map;
+  }
+
+  /// Server order uuids that already have a local invoice (for the orders
+  /// list "invoiced" marker). Soft-deleted invoices don't count.
+  Future<Set<String>> getInvoicedOrderIds() async {
+    final filter = await SyncMetadata.notDeletedClause(
+      db,
+      DbConstants.tableInvoice,
+    );
+    final rows = await db.query(
+      DbConstants.tableInvoice,
+      columns: [DbConstants.columnInvoiceOrderId],
+      where: '${DbConstants.columnInvoiceOrderId} IS NOT NULL AND ($filter)',
+    );
+    final ids = <String>{};
+    for (final row in rows) {
+      final id = row[DbConstants.columnInvoiceOrderId]?.toString();
+      if (id != null && id.isNotEmpty) ids.add(id);
+    }
+    return ids;
   }
 
   Future<void> delete(Invoice invoice) async {

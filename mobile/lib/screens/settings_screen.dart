@@ -17,12 +17,17 @@ import 'package:i_gen/utils/context_extensions.dart';
 import 'package:i_gen/utils/locale_controller.dart';
 import 'package:i_gen/widgets/sync_status_card.dart';
 
-/// Settings: sign-in state + admin invite surface + sync status.
+/// Settings: sign-in state + admin invite tiles + sync status + backups.
 ///
 /// Login is optional and never blocks offline use; sign-up is invite-only so
 /// there is no "create account" path here — new users arrive via an admin
 /// WhatsApp link and accept it below. The sync card appears only after the
 /// staging gate passes ([kSyncStagingGatePassed]).
+///
+/// Invite creation is two role-specific tiles that each open a dialog; there
+/// is deliberately no invite history — the generated link/dialog is the only
+/// copy, and closing it discards it. Admins are expected to share
+/// immediately (see the share-first result panel in [_InviteDialog]).
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -34,8 +39,6 @@ class SettingsScreen extends StatelessWidget {
         appBar: AppBar(
           title: Text(context.l10n.navSettings),
           actions: [
-            // Locale lives here now (was the General tab): one tap toggles
-            // ar/en via LocaleController; MaterialApp rebuilds on notify.
             IconButton(
               tooltip: Localizations.localeOf(context).languageCode == 'ar'
                   ? 'English'
@@ -53,44 +56,110 @@ class SettingsScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _tab(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _AuthCard(),
-                  const SizedBox(height: AppGaps.xl),
-                  const _InviteCard(),
-                  if (kSyncStagingGatePassed) ...[
-                    const SizedBox(height: AppGaps.xl),
-                    const SyncStatusCard(),
-                    const SizedBox(height: AppGaps.sm),
-                    Text(
-                      context.l10n.settingsOfflineFirstNote,
-                      style: context.textTheme.bodySmall?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            _tab(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: const [_BackupCard()],
-              ),
-            ),
+            _tab([
+              const _AuthCard(),
+              const _InviteTilesCard(),
+              if (kSyncStagingGatePassed) const _SyncSection(),
+            ]),
+            _tab(const [_BackupCard()]),
           ],
         ),
       ),
     );
   }
 
-  /// Shared tab padding: the old single-scroll body padded once at the top.
-  static Widget _tab(Widget child) {
+  /// Shared tab padding; content is width-capped and centered so text/cards
+  /// stay readable instead of stretching edge-to-edge on wide screens.
+  static Widget _tab(List<Widget> children) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppGaps.md),
-      child: child,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final child in children) ...[
+                child,
+                const SizedBox(height: AppGaps.xl),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Consistent card shell used across every settings surface.
+class SettingsCard extends StatelessWidget {
+  const SettingsCard({super.key, required this.child, this.color});
+
+  final Widget child;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: color,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Padding(padding: const EdgeInsets.all(AppGaps.md), child: child),
+    );
+  }
+}
+
+/// Inline error banner — reused by every form on this screen.
+class ErrorBanner extends StatelessWidget {
+  const ErrorBanner({super.key, required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppGaps.sm),
+      decoration: BoxDecoration(
+        color: context.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 18,
+            color: context.colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: AppGaps.xs),
+          Expanded(
+            child: Text(
+              message,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Dims + locks a form's contents while busy, so "this is working" reads as
+/// one visual state instead of relying on users noticing disabled fields.
+class BusyGate extends StatelessWidget {
+  const BusyGate({super.key, required this.busy, required this.child});
+  final bool busy;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: busy ? 0.6 : 1,
+      duration: const Duration(milliseconds: 150),
+      child: AbsorbPointer(absorbing: busy, child: child),
     );
   }
 }
@@ -217,40 +286,34 @@ class _AuthCardState extends State<_AuthCard> {
   @override
   Widget build(BuildContext context) {
     if (!_auth.isConfigured) {
-      return Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppGaps.md),
-          child: Row(
-            children: [
-              Icon(
-                Icons.cloud_off_outlined,
-                color: context.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: AppGaps.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.syncNotConfigured,
-                      style: context.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+      return SettingsCard(
+        child: Row(
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              color: context.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: AppGaps.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.syncNotConfigured,
+                    style: context.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                    Text(
-                      context.l10n.syncNotConfiguredHint,
-                      style: context.textTheme.bodySmall?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
-                      ),
+                  ),
+                  Text(
+                    context.l10n.syncNotConfiguredHint,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: context.colorScheme.onSurfaceVariant,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -260,68 +323,59 @@ class _AuthCardState extends State<_AuthCard> {
       builder: (context, snapshot) {
         final user = snapshot.data ?? _auth.currentUser;
         if (user != null) {
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.card),
-            ),
+          return SettingsCard(
             color: context.colorScheme.surfaceContainerHighest.withValues(
               alpha: 0.4,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppGaps.md),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: context.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.control),
-                    ),
-                    child: Icon(
-                      Icons.account_circle_outlined,
-                      color: context.colorScheme.onPrimaryContainer,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
                   ),
-                  const SizedBox(width: AppGaps.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.email ?? context.l10n.signedInFallback,
-                          style: context.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: Icon(
+                    Icons.account_circle_outlined,
+                    color: context.colorScheme.onPrimaryContainer,
                   ),
-                  const SizedBox(width: AppGaps.sm),
-                  _busy
-                      ? const SizedBox(
-                          width: AppGaps.md,
-                          height: AppGaps.md,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : TextButton(
-                          style: const ButtonStyle(
-                            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
-                          ),
-                          onPressed: () => _run(() => _auth.signOut()),
-                          child: Text(context.l10n.signOut),
+                ),
+                const SizedBox(width: AppGaps.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.email ?? context.l10n.signedInFallback,
+                        style: context.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
-                ],
-              ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppGaps.sm),
+                _busy
+                    ? const SizedBox(
+                        width: AppGaps.md,
+                        height: AppGaps.md,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : TextButton(
+                        style: const ButtonStyle(
+                          minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+                        ),
+                        onPressed: () => _run(() => _auth.signOut()),
+                        child: Text(context.l10n.signOut),
+                      ),
+              ],
             ),
           );
         }
-        return Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.card),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppGaps.md),
+        return SettingsCard(
+          child: BusyGate(
+            busy: _busy,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -362,7 +416,6 @@ class _AuthCardState extends State<_AuthCard> {
                       borderRadius: BorderRadius.circular(AppRadii.control),
                     ),
                   ),
-                  enabled: !_busy,
                 ),
                 const SizedBox(height: AppGaps.sm),
                 TextField(
@@ -375,30 +428,22 @@ class _AuthCardState extends State<_AuthCard> {
                       borderRadius: BorderRadius.circular(AppRadii.control),
                     ),
                   ),
-                  enabled: !_busy,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: AppGaps.sm),
-                  Text(
-                    _error!,
-                    style: context.textTheme.bodyMedium?.copyWith(
-                      color: context.colorScheme.error,
-                    ),
-                  ),
+                  ErrorBanner(message: _error!),
                 ],
                 const SizedBox(height: AppGaps.md),
                 FilledButton(
                   style: const ButtonStyle(
                     minimumSize: WidgetStatePropertyAll(Size(64, 48)),
                   ),
-                  onPressed: _busy
-                      ? null
-                      : () => _run(
-                          () => _auth.signIn(
-                            email: _email.text.trim(),
-                            password: _password.text,
-                          ),
-                        ),
+                  onPressed: () => _run(
+                    () => _auth.signIn(
+                      email: _email.text.trim(),
+                      password: _password.text,
+                    ),
+                  ),
                   child: Text(context.l10n.signInAction),
                 ),
                 const SizedBox(height: AppGaps.sm),
@@ -406,7 +451,7 @@ class _AuthCardState extends State<_AuthCard> {
                   style: const ButtonStyle(
                     minimumSize: WidgetStatePropertyAll(Size(64, 48)),
                   ),
-                  onPressed: _busy ? null : _showInviteSheet,
+                  onPressed: _showInviteSheet,
                   icon: const Icon(Icons.link_outlined, size: 20),
                   label: Text(context.l10n.haveInviteLinkTitle),
                 ),
@@ -423,7 +468,543 @@ extension _Center on Widget {
   Widget center() => Center(child: this);
 }
 
-/// Manual backup (share sheet) + restore-from-file + auto-backup status.
+/// Admin-only invite surface: two role-specific tiles, each opening
+/// [_InviteDialog] pre-locked to that role. Hidden for every other role —
+/// and the server function re-checks adminship, so hiding is convenience,
+/// not the defense.
+class _InviteTilesCard extends StatelessWidget {
+  const _InviteTilesCard();
+
+  static const double _twoColumnThreshold = 420;
+
+  void _openDialog(BuildContext context, UserRole role) {
+    showDialog(
+      context: context,
+      builder: (_) => _InviteDialog(role: role),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = AuthService.instance;
+    if (!auth.isConfigured) return const SizedBox.shrink();
+    return StreamBuilder<UserRole?>(
+      stream: auth.currentRoleStream,
+      initialData: auth.currentRole,
+      builder: (context, snapshot) {
+        if (!auth.isSignedIn || snapshot.data != UserRole.admin) {
+          return const SizedBox.shrink();
+        }
+        return SettingsCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_add_outlined,
+                    color: context.colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppGaps.sm),
+                  Expanded(
+                    child: Text(
+                      context.l10n.inviteUsersTitle,
+                      style: context.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppGaps.xs),
+              Text(
+                context.l10n.inviteUsersHint,
+                style: context.textTheme.bodySmall?.copyWith(
+                  color: context.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppGaps.md),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final employee = _InviteRoleTile(
+                    icon: Icons.badge_outlined,
+                    label: context.l10n.roleEmployee,
+                    onTap: () => _openDialog(context, UserRole.employee),
+                  );
+                  final customer = _InviteRoleTile(
+                    icon: Icons.local_shipping_outlined,
+                    label: context.l10n.roleCustomer,
+                    onTap: () => _openDialog(context, UserRole.customer),
+                  );
+                  if (constraints.maxWidth < _twoColumnThreshold) {
+                    return Column(
+                      children: [
+                        employee,
+                        const SizedBox(height: AppGaps.sm),
+                        customer,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: employee),
+                      const SizedBox(width: AppGaps.sm),
+                      Expanded(child: customer),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// A single role-specific "start an invite" tile — deliberately not styled
+/// as a navigation row (no chevron): tapping opens a dialog on top of the
+/// current screen, it doesn't drill into another page.
+class _InviteRoleTile extends StatelessWidget {
+  const _InviteRoleTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadii.control),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          vertical: AppGaps.md,
+          horizontal: AppGaps.sm,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: context.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: context.colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: context.colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(height: AppGaps.xs),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: context.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Icon(
+              Icons.add_circle_outline,
+              size: 16,
+              color: context.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The invite creation dialog. Role is fixed by whichever tile opened it —
+/// there's no role picker here, since that decision already happened.
+/// Mode (new/resend/recovery) is still selectable: it's a different axis
+/// than role. On success the dialog flips in place to a share-first result
+/// panel; closing the dialog discards the link — there is intentionally no
+/// history, so admins are expected to share immediately.
+class _InviteDialog extends StatefulWidget {
+  const _InviteDialog({required this.role});
+  final UserRole role;
+
+  @override
+  State<_InviteDialog> createState() => _InviteDialogState();
+}
+
+class _InviteDialogState extends State<_InviteDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameAr = TextEditingController();
+  final _nameEn = TextEditingController();
+  final _phone = TextEditingController();
+  InviteMode _mode = InviteMode.invite;
+  bool _busy = false;
+  String? _error;
+  InviteResult? _result;
+
+  @override
+  void dispose() {
+    _nameAr.dispose();
+    _nameEn.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  String get _roleLabel => widget.role == UserRole.employee
+      ? context.l10n.roleEmployee
+      : context.l10n.roleCustomer;
+
+  String get _actionLabel => switch (_mode) {
+    InviteMode.invite => context.l10n.createInviteLink,
+    InviteMode.resend => context.l10n.resendInviteLink,
+    InviteMode.recovery => context.l10n.sendPasswordResetLink,
+  };
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final result = await InviteService().send(
+        nameAr: _nameAr.text,
+        nameEn: _nameEn.text,
+        phone: _phone.text,
+        role: widget.role,
+        mode: _mode,
+      );
+      if (mounted) setState(() => _result = result);
+    } on AuthOfflineException catch (e) {
+      setState(() => _error = e.message);
+    } on AuthFailureException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      setState(() => _error = context.l10n.unexpectedError('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _copy(InviteResult result) {
+    Clipboard.setData(
+      ClipboardData(
+        text: context.l10n.inviteShareText(result.fakeEmail, result.actionLink),
+      ),
+    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.l10n.inviteCopiedHint)));
+  }
+
+  Future<void> _share(InviteResult result) async {
+    // Once `share_plus` is added to pubspec.yaml, replace this with:
+    //   await Share.share(context.l10n.inviteShareText(result.fakeEmail, result.actionLink));
+    // Until then, share falls back to copy (same clipboard payload).
+    _copy(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      insetPadding: const EdgeInsets.all(AppGaps.md),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(AppGaps.lg),
+          child: SingleChildScrollView(
+            child: _result != null
+                ? _buildResult(context)
+                : _buildForm(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    final slug = _nameEn.text.trim().isEmpty
+        ? null
+        : InviteService.slugPreview(_nameEn.text);
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  // TODO(l10n): a combined "Invite {role}" title string
+                  // would read better than concatenating two keys.
+                  '${context.l10n.inviteUsersTitle} · $_roleLabel',
+                  style: context.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: context.l10n.cancelButton,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppGaps.sm),
+          Text(
+            context.l10n.inviteActionLabel,
+            style: context.textTheme.labelLarge,
+          ),
+          const SizedBox(height: AppGaps.xs),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<InviteMode>(
+              segments: [
+                ButtonSegment(
+                  value: InviteMode.invite,
+                  label: Text(context.l10n.inviteModeNew),
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: InviteMode.resend,
+                  label: Text(context.l10n.inviteModeResend),
+                  icon: const Icon(Icons.send_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: InviteMode.recovery,
+                  label: Text(context.l10n.inviteModeRecovery),
+                  icon: const Icon(Icons.lock_reset_outlined, size: 16),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: _busy
+                  ? null
+                  : (s) => setState(() => _mode = s.first),
+            ),
+          ),
+          if (_mode != InviteMode.invite) ...[
+            const SizedBox(height: AppGaps.xs),
+            Text(
+              // TODO(l10n): there's no user lookup yet, so resend/recovery
+              // still require re-typing the person's original details.
+              "Enter this person's existing details exactly as used before.",
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppGaps.md),
+          BusyGate(
+            busy: _busy,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _nameAr,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.nameArabicLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                    ),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      // TODO(l10n): proper "required" validation message.
+                      ? context.l10n.nameArabicLabel
+                      : null,
+                ),
+                const SizedBox(height: AppGaps.sm),
+                TextFormField(
+                  controller: _nameEn,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.nameEnglishLabel,
+                    helperText: slug == null
+                        ? null
+                        : context.l10n.loginPreview(slug),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? context.l10n.nameEnglishLabel
+                      : null,
+                ),
+                const SizedBox(height: AppGaps.sm),
+                TextFormField(
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.phoneWhatsappLabel,
+                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                    ),
+                  ),
+                  validator: (v) => (v == null || v.trim().length < 6)
+                      ? context.l10n.phoneWhatsappLabel
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppGaps.md),
+            ErrorBanner(message: _error!),
+          ],
+          const SizedBox(height: AppGaps.lg),
+          FilledButton(
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+            ),
+            onPressed: _busy ? null : _submit,
+            child: _busy
+                ? const SizedBox(
+                    width: AppGaps.md,
+                    height: AppGaps.md,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(_actionLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResult(BuildContext context) {
+    final result = _result!;
+    final name = _nameEn.text.trim().isEmpty
+        ? _nameAr.text.trim()
+        : _nameEn.text.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+              tooltip: context.l10n.cancelButton,
+            ),
+          ],
+        ),
+        Icon(
+          Icons.check_circle_outline,
+          color: context.colorScheme.primary,
+          size: 40,
+        ),
+        const SizedBox(height: AppGaps.sm),
+        Text(
+          // TODO(l10n): dedicated "Ready to send" string.
+          'Ready to send',
+          textAlign: TextAlign.center,
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppGaps.xs),
+        Text(
+          '$name · $_roleLabel',
+          textAlign: TextAlign.center,
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: context.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppGaps.md),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppGaps.sm),
+          decoration: BoxDecoration(
+            color: context.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            border: Border.all(color: context.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText(
+                context.l10n.loginEmailLabel(result.fakeEmail),
+                style: context.textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppGaps.xs),
+              SelectableText(
+                result.actionLink,
+                style: context.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppGaps.md),
+        FilledButton.icon(
+          style: const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+          ),
+          onPressed: () => _share(result),
+          icon: const Icon(Icons.share_outlined),
+          // TODO(l10n): dedicated "Share link" string — reusing the copy
+          // label as a stopgap since both currently do the same thing.
+          label: Text(context.l10n.copyForWhatsapp),
+        ),
+        const SizedBox(height: AppGaps.sm),
+        OutlinedButton.icon(
+          style: const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+          ),
+          onPressed: () => _copy(result),
+          icon: const Icon(Icons.copy_outlined),
+          label: Text(context.l10n.copyForWhatsapp),
+        ),
+        const SizedBox(height: AppGaps.sm),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          // TODO(l10n): dedicated "Close" string.
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Sync status card + the offline-first reassurance note beneath it.
+class _SyncSection extends StatelessWidget {
+  const _SyncSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SyncStatusCard(),
+        const SizedBox(height: AppGaps.sm),
+        Text(
+          context.l10n.settingsOfflineFirstNote,
+          style: context.textTheme.bodySmall?.copyWith(
+            color: context.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Manual backup (save to folder) + restore-from-file + auto-backup status.
 ///
 /// Backup failures toast and never touch live data. Restore validates the
 /// picked file before anything is swapped; when the outbox holds unsynced
@@ -483,9 +1064,6 @@ class _BackupCardState extends State<_BackupCard> {
     return DateFormat.yMd(code).add_Hm().format(time.toLocal());
   }
 
-  /// Saves a timestamped `.db` to the default folder (or a one-off folder
-  /// picked now when none is set), then toasts the path. No share sheet:
-  /// the folder IS the destination.
   Future<void> _backupNow() async {
     if (_busy) return;
     setState(() => _op = _BackupOp.backingUp);
@@ -526,16 +1104,12 @@ class _BackupCardState extends State<_BackupCard> {
     await _loadStatus();
   }
 
-  Future<void> _setInterval(int? days) async {
-    if (days == null) return;
+  Future<void> _setInterval(int days) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(BackupService.autoIntervalDaysKey, days);
     await _loadStatus();
   }
 
-  /// Picks a `.db` file, validates it before touching live data, confirms
-  /// the replacement when unsynced changes exist, then swaps + re-seats
-  /// the database and triggers a post-restore sync.
   Future<void> _restore() async {
     if (_busy) return;
     final picked = await FilePicker.pickFile(
@@ -598,12 +1172,9 @@ class _BackupCardState extends State<_BackupCard> {
     final status = _lastAuto == null
         ? context.l10n.backupLastAuto(context.l10n.neverSynced)
         : context.l10n.backupLastAuto(_format(_lastAuto!));
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppGaps.md),
+    return SettingsCard(
+      child: BusyGate(
+        busy: _busy,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -628,60 +1199,67 @@ class _BackupCardState extends State<_BackupCard> {
                 color: context.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: AppGaps.md),
-            Row(
-              children: [
-                Expanded(child: Text(context.l10n.backupInterval)),
-                DropdownButton<int>(
-                  value: _intervalDays,
-                  items: [
-                    DropdownMenuItem(
-                      value: 0,
-                      child: Text(context.l10n.backupIntervalOff),
-                    ),
-                    DropdownMenuItem(
-                      value: 1,
-                      child: Text(context.l10n.backupIntervalDaily),
-                    ),
-                    DropdownMenuItem(
-                      value: 7,
-                      child: Text(context.l10n.backupIntervalWeekly),
-                    ),
-                    DropdownMenuItem(
-                      value: 30,
-                      child: Text(context.l10n.backupIntervalMonthly),
-                    ),
-                  ],
-                  onChanged: _busy ? null : _setInterval,
-                ),
-              ],
+            const Divider(height: AppGaps.xl),
+            Text(
+              context.l10n.backupInterval,
+              style: context.textTheme.labelLarge,
             ),
-            const SizedBox(height: AppGaps.sm),
+            const SizedBox(height: AppGaps.xs),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<int>(
+                segments: [
+                  ButtonSegment(
+                    value: 0,
+                    label: Text(context.l10n.backupIntervalOff),
+                  ),
+                  ButtonSegment(
+                    value: 1,
+                    label: Text(context.l10n.backupIntervalDaily),
+                  ),
+                  ButtonSegment(
+                    value: 7,
+                    label: Text(context.l10n.backupIntervalWeekly),
+                  ),
+                  ButtonSegment(
+                    value: 30,
+                    label: Text(context.l10n.backupIntervalMonthly),
+                  ),
+                ],
+                selected: {_intervalDays},
+                onSelectionChanged: _busy
+                    ? null
+                    : (selection) => _setInterval(selection.first),
+              ),
+            ),
+            const Divider(height: AppGaps.xl),
+            Text(
+              context.l10n.backupLocation,
+              style: context.textTheme.labelLarge,
+            ),
+            const SizedBox(height: AppGaps.xs),
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(context.l10n.backupLocation),
-                      Text(
-                        _defaultDir ?? context.l10n.backupNoLocation,
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  child: Tooltip(
+                    message: _defaultDir ?? context.l10n.backupNoLocation,
+                    child: Text(
+                      _defaultDir ?? context.l10n.backupNoLocation,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: context.colorScheme.onSurfaceVariant,
                       ),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
                 TextButton(
-                  onPressed: _busy ? null : _pickDefaultDir,
+                  onPressed: _pickDefaultDir,
                   child: Text(context.l10n.backupPickFolder),
                 ),
                 if (_defaultDir != null)
                   TextButton(
-                    onPressed: _busy ? null : _clearDefaultDir,
+                    onPressed: _clearDefaultDir,
                     child: Text(context.l10n.backupClearFolder),
                   ),
               ],
@@ -705,17 +1283,20 @@ class _BackupCardState extends State<_BackupCard> {
                 ],
               )
             else
-              Row(
+              Wrap(
+                spacing: AppGaps.sm,
+                runSpacing: AppGaps.sm,
                 children: [
-                  Expanded(
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 160),
                     child: FilledButton.icon(
                       onPressed: _backupNow,
                       icon: const Icon(Icons.save_alt_outlined, size: 20),
                       label: Text(context.l10n.backupNow),
                     ),
                   ),
-                  const SizedBox(width: AppGaps.sm),
-                  Expanded(
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 160),
                     child: OutlinedButton.icon(
                       onPressed: _restore,
                       icon: const Icon(Icons.restore_outlined, size: 20),
@@ -727,350 +1308,6 @@ class _BackupCardState extends State<_BackupCard> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Admin-only invite/resend/recover surface. Hidden for every other role —
-/// and the server function re-checks adminship, so hiding is convenience,
-/// not the defense.
-class _InviteCard extends StatefulWidget {
-  const _InviteCard();
-
-  @override
-  State<_InviteCard> createState() => _InviteCardState();
-}
-
-class _InviteCardState extends State<_InviteCard> {
-  final _nameAr = TextEditingController();
-  final _nameEn = TextEditingController();
-  final _phone = TextEditingController();
-  UserRole _role = UserRole.employee;
-  InviteMode _mode = InviteMode.invite;
-  bool _busy = false;
-  bool _expanded = false;
-  String? _error;
-  InviteResult? _result;
-
-  @override
-  void dispose() {
-    _nameAr.dispose();
-    _nameEn.dispose();
-    _phone.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-      _result = null;
-    });
-    try {
-      final result = await InviteService().send(
-        nameAr: _nameAr.text,
-        nameEn: _nameEn.text,
-        phone: _phone.text,
-        role: _role,
-        mode: _mode,
-      );
-      if (mounted) setState(() => _result = result);
-    } on AuthOfflineException catch (e) {
-      setState(() => _error = e.message);
-    } on AuthFailureException catch (e) {
-      setState(() => _error = e.message);
-    } catch (e) {
-      setState(() => _error = context.l10n.unexpectedError('$e'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final auth = AuthService.instance;
-    if (!auth.isConfigured) return const SizedBox.shrink();
-    return StreamBuilder<UserRole?>(
-      stream: auth.currentRoleStream,
-      initialData: auth.currentRole,
-      builder: (context, snapshot) {
-        if (!auth.isSignedIn || snapshot.data != UserRole.admin) {
-          return const SizedBox.shrink();
-        }
-        final slugHint = _nameEn.text.trim().isEmpty
-            ? ''
-            : context.l10n.loginPreview(
-                InviteService.slugPreview(_nameEn.text),
-              );
-        return Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.card),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppGaps.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InkWell(
-                  borderRadius: BorderRadius.circular(AppRadii.control),
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppGaps.xs),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.person_add_outlined,
-                          color: context.colorScheme.primary,
-                        ),
-                        const SizedBox(width: AppGaps.sm),
-                        Expanded(
-                          child: Text(
-                            context.l10n.inviteUsersTitle,
-                            style: context.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        AnimatedRotation(
-                          turns: _expanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            Icons.expand_more_outlined,
-                            color: context.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (!_expanded) ...[
-                  const SizedBox(height: AppGaps.xs),
-                  Text(
-                    context.l10n.inviteUsersHint,
-                    style: context.textTheme.bodySmall?.copyWith(
-                      color: context.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: AppGaps.md),
-                  FilledButton.icon(
-                    style: const ButtonStyle(
-                      minimumSize: WidgetStatePropertyAll(Size(64, 48)),
-                    ),
-                    onPressed: () => setState(() => _expanded = true),
-                    icon: const Icon(Icons.add, size: 20),
-                    label: Text(switch (_mode) {
-                      InviteMode.invite => context.l10n.createInviteLink,
-                      InviteMode.resend => context.l10n.resendInviteLink,
-                      InviteMode.recovery => context.l10n.sendPasswordResetLink,
-                    }),
-                  ),
-                ],
-                AnimatedCrossFade(
-                  firstChild: const SizedBox.shrink(),
-                  secondChild: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: AppGaps.xs),
-                      Text(
-                        context.l10n.inviteUsersHint,
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppGaps.md),
-                      TextField(
-                        controller: _nameAr,
-                        decoration: InputDecoration(
-                          labelText: context.l10n.nameArabicLabel,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.control,
-                            ),
-                          ),
-                        ),
-                        enabled: !_busy,
-                      ),
-                      const SizedBox(height: AppGaps.sm),
-                      TextField(
-                        controller: _nameEn,
-                        decoration: InputDecoration(
-                          labelText: context.l10n.nameEnglishLabel,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.control,
-                            ),
-                          ),
-                        ),
-                        enabled: !_busy,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      if (slugHint.isNotEmpty) ...[
-                        const SizedBox(height: AppGaps.xs),
-                        Text(slugHint, style: context.textTheme.bodySmall),
-                      ],
-                      const SizedBox(height: AppGaps.sm),
-                      TextField(
-                        controller: _phone,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: context.l10n.phoneWhatsappLabel,
-                          prefixIcon: const Icon(
-                            Icons.phone_outlined,
-                            size: 20,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.control,
-                            ),
-                          ),
-                        ),
-                        enabled: !_busy,
-                      ),
-                      const SizedBox(height: AppGaps.md),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<UserRole>(
-                              initialValue: _role,
-                              decoration: InputDecoration(
-                                labelText: context.l10n.roleFieldLabel,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadii.control,
-                                  ),
-                                ),
-                              ),
-                              items: [
-                                DropdownMenuItem(
-                                  value: UserRole.employee,
-                                  child: Text(context.l10n.roleEmployee),
-                                ),
-                                DropdownMenuItem(
-                                  value: UserRole.distributor,
-                                  child: Text(context.l10n.roleDistributor),
-                                ),
-                              ],
-                              onChanged: _busy
-                                  ? null
-                                  : (value) {
-                                      if (value != null) {
-                                        setState(() => _role = value);
-                                      }
-                                    },
-                            ),
-                          ),
-                          const SizedBox(width: AppGaps.sm),
-                          Expanded(
-                            child: DropdownButtonFormField<InviteMode>(
-                              initialValue: _mode,
-                              decoration: InputDecoration(
-                                labelText: context.l10n.inviteActionLabel,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadii.control,
-                                  ),
-                                ),
-                              ),
-                              items: [
-                                DropdownMenuItem(
-                                  value: InviteMode.invite,
-                                  child: Text(context.l10n.inviteModeNew),
-                                ),
-                                DropdownMenuItem(
-                                  value: InviteMode.resend,
-                                  child: Text(context.l10n.inviteModeResend),
-                                ),
-                                DropdownMenuItem(
-                                  value: InviteMode.recovery,
-                                  child: Text(context.l10n.inviteModeRecovery),
-                                ),
-                              ],
-                              onChanged: _busy
-                                  ? null
-                                  : (value) {
-                                      if (value != null) {
-                                        setState(() => _mode = value);
-                                      }
-                                    },
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: AppGaps.sm),
-                        Text(
-                          _error!,
-                          style: context.textTheme.bodyMedium?.copyWith(
-                            color: context.colorScheme.error,
-                          ),
-                        ),
-                      ],
-                      if (_result != null) ...[
-                        const SizedBox(height: AppGaps.sm),
-                        SelectableText(
-                          context.l10n.loginEmailLabel(_result!.fakeEmail),
-                        ),
-                        const SizedBox(height: AppGaps.xs),
-                        SelectableText(_result!.actionLink),
-                        const SizedBox(height: AppGaps.sm),
-                        OutlinedButton.icon(
-                          style: const ButtonStyle(
-                            minimumSize: WidgetStatePropertyAll(Size(64, 48)),
-                          ),
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(
-                                text: context.l10n.inviteShareText(
-                                  _result!.fakeEmail,
-                                  _result!.actionLink,
-                                ),
-                              ),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(context.l10n.inviteCopiedHint),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.copy_outlined),
-                          label: Text(context.l10n.copyForWhatsapp),
-                        ),
-                      ],
-                      const SizedBox(height: AppGaps.md),
-                      FilledButton(
-                        style: const ButtonStyle(
-                          minimumSize: WidgetStatePropertyAll(Size(64, 48)),
-                        ),
-                        onPressed: _busy ? null : _send,
-                        child: _busy
-                            ? const SizedBox(
-                                width: AppGaps.md,
-                                height: AppGaps.md,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(switch (_mode) {
-                                InviteMode.invite =>
-                                  context.l10n.createInviteLink,
-                                InviteMode.resend =>
-                                  context.l10n.resendInviteLink,
-                                InviteMode.recovery =>
-                                  context.l10n.sendPasswordResetLink,
-                              }),
-                      ),
-                    ],
-                  ),
-                  crossFadeState: _expanded
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 200),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

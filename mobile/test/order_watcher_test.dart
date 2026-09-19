@@ -18,7 +18,7 @@ Map<String, dynamic> orderRow(
   String? createdAt,
 }) => {
   'id': id,
-  'distributor_id': 'dist-1',
+  'customer_id': 'cust-1',
   'status': status,
   'total': total,
   'currency': currency,
@@ -106,14 +106,14 @@ void main() {
 
   test('non-pending inserts stay silent', () async {
     final h = await _Harness.create();
-    h.events.emit(orderRow('o1', status: 'confirmed'));
+    h.events.emit(orderRow('o1', status: 'completed'));
     h.events.emit(orderRow('o2', status: 'cancelled'));
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(h.notifier.shown, isEmpty);
 
     h.setServer([
-      orderRow('o1', status: 'confirmed'),
-      orderRow('o2', status: 'delivered'),
+      orderRow('o1', status: 'completed'),
+      orderRow('o2', status: 'completed'),
     ]);
     await h.watcher.debugPollOnce();
     expect(h.notifier.shown, isEmpty);
@@ -152,7 +152,7 @@ void main() {
     events2.dispose();
   });
 
-  test('logout unsubscribes and stops; distributor never subscribes', () async {
+  test('logout unsubscribes and stops; customer never subscribes', () async {
     final h = await _Harness.create();
     expect(h.watcher.debugActive, isTrue);
 
@@ -161,9 +161,9 @@ void main() {
     expect(h.watcher.debugActive, isFalse);
     expect(h.events.unsubscribes, 1);
 
-    // Distributor login: stays dormant, no permission prompt.
+    // Customer login: stays dormant, no permission prompt.
     final prompts = h.notifier.permissionRequests;
-    h.roles.add(UserRole.distributor);
+    h.roles.add(UserRole.customer);
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(h.watcher.debugActive, isFalse);
     expect(h.events.subscribes, 1);

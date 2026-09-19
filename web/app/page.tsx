@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
@@ -11,62 +11,86 @@ import { parseProduct, type Product } from "@/lib/types";
 
 type FetchState = "loading" | "ready" | "offline" | "error";
 
-function ProductCard({
-  product,
-  onAdd,
-}: {
-  product: Product;
-  onAdd: (size: string, qty: number) => void;
-}) {
+function ProductCard({ product }: { product: Product }) {
   const { t } = useI18n();
-  const [size, setSize] = useState(product.sizes[0] ?? "");
-  const [qty, setQty] = useState(1);
-  return (
-    <div className="card flex flex-col gap-2">
-      <div>
-        <div className="font-bold">{product.name}</div>
-        <div className="muted text-sm">{product.model}</div>
-      </div>
-      {product.sizes.length > 0 ? (
-        <label className="flex items-center gap-2 text-sm">
-          <span className="muted">{t.sizes}</span>
-          <select
-            className="input !w-auto"
-            value={size}
-            onChange={(e) => setSize(e.target.value)}
-          >
-            {product.sizes.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : (
-        <div className="muted text-sm">{t.sizeless}</div>
-      )}
-      <div className="flex items-center gap-2 mt-auto">
+  const cart = useCart();
+  const lines = cart.lines.filter((l) => l.productId === product.id);
+  const qtyOf = (size: string) =>
+    lines.find((l) => l.size === size)?.qty ?? 0;
+  const total = lines.reduce((n, l) => n + l.qty, 0);
+  const selected = total > 0;
+  const addLine = (size: string, qty: number) =>
+    cart.add(
+      {
+        productId: product.id,
+        model: product.model,
+        name: product.name,
+        size,
+      },
+      qty,
+    );
+  // Products without sizes: no size row at all — the header itself is the
+  // tap target (+1), with qty pill + corner minus once selected.
+  if (product.sizes.length === 0) {
+    return (
+      <div className={selected ? "card card-on relative" : "card relative"}>
         <button
-          className="btn btn-ghost !px-2 !py-1"
-          onClick={() => setQty((q) => Math.max(1, q - 1))}
-          aria-label="-"
+          type="button"
+          aria-label={`${product.model} ${product.name}: ${total}`}
+          onClick={() => addLine("", 1)}
+          className="sizeless-hit"
+        >
+          <span className="text-[15px] font-semibold">{product.model}</span>
+          <span className=" text-sm truncate">{product.name}</span>
+          {selected ? <span className="badge">× {total}</span> : null}
+        </button>
+        {selected ? (
+        <button
+          type="button"
+          aria-label={`${t.decrease}: ${product.model} ${product.name}`}
+          onClick={() => cart.setQty(product.id, "", total - 1)}
+          className="size-dec"
         >
           −
         </button>
-        <span className="w-8 text-center font-bold">{qty}</span>
-        <button
-          className="btn btn-ghost !px-2 !py-1"
-          onClick={() => setQty((q) => Math.min(999, q + 1))}
-          aria-label="+"
-        >
-          +
-        </button>
-        <button
-          className="btn btn-primary !py-1 ms-auto"
-          onClick={() => onAdd(size, qty)}
-        >
-          {t.add}
-        </button>
+        ) : null}
+      </div>
+    );
+  }
+  return (
+    <div className="card flex flex-col gap-2">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[15px] font-semibold">{product.model}</span>
+        <span className="text-sm truncate">{product.name}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {product.sizes.map((size) => {
+          const qty = qtyOf(size);
+          const on = qty > 0;
+          return (
+            <div key={size} className="relative">
+              <button
+                type="button"
+                aria-label={`${size}: ${qty}`}
+                onClick={() => addLine(size, 1)}
+                className={on ? "size-card size-card-on" : "size-card"}
+              >
+                <span className="size-label">{size}</span>
+                <span className="size-qty">{qty}</span>
+              </button>
+              {on ? (
+              <button
+                type="button"
+                aria-label={`${t.decrease}: ${size} · ${product.model}`}
+                onClick={() => cart.setQty(product.id, size, qty - 1)}
+                className="size-dec"
+              >
+                −
+              </button>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -82,6 +106,42 @@ export default function CatalogPage() {
   const [query, setQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Modal behavior: focus in on open, Escape closes, Tab wraps inside,
+  // focus returns to the FAB on close.
+  useEffect(() => {
+    if (!previewOpen) return;
+    const trigger = fabRef.current;
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const items = [...dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )].filter((el) => !el.hasAttribute("disabled"));
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      trigger?.focus();
+    };
+  }, [previewOpen]);
 
   const fetchProducts = useCallback(async () => {
     setState("loading");
@@ -132,7 +192,7 @@ export default function CatalogPage() {
       const sb = getSupabase();
       const { data: order, error: orderError } = await sb
         .from("orders")
-        .insert({ distributor_id: userId })
+        .insert({ customer_id: userId })
         .select("id")
         .single();
       if (orderError) throw orderError;
@@ -148,6 +208,7 @@ export default function CatalogPage() {
       );
       if (itemsError) throw itemsError;
       cart.clear();
+      setPreviewOpen(false);
       router.push(`/orders/${orderId}`);
     } catch {
       setSubmitError(t.unknownError);
@@ -161,7 +222,6 @@ export default function CatalogPage() {
     return (
       <div className="card flex flex-col gap-3 items-start">
         <p className="font-bold">{t.needSignIn}</p>
-        <p className="muted">{t.signInCta}</p>
         <Link href="/login" className="btn btn-primary">
           {t.signIn}
         </Link>
@@ -182,8 +242,10 @@ export default function CatalogPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <h1 className="sr-only">{t.catalog}</h1>
       <input
         className="input"
+        aria-label={t.search}
         placeholder={t.search}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -193,62 +255,89 @@ export default function CatalogPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {filtered.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onAdd={(size, qty) =>
-                cart.add(
-                  {
-                    productId: p.id,
-                    model: p.model,
-                    name: p.name,
-                    size,
-                  },
-                  qty,
-                )
-              }
-            />
+            <ProductCard key={p.id} product={p} />
           ))}
         </div>
       )}
       {cart.lines.length > 0 ? (
-        <div className="card flex flex-col gap-2 sticky bottom-4">
-          <div className="font-bold">
-            {t.cart} · {cart.count}
-          </div>
-          {cart.lines.map((l) => (
-            <div
-              key={`${l.productId}|${l.size}`}
-              className="flex items-center gap-2 text-sm"
-            >
-              <span className="flex-1">
-                {l.name}
-                {l.size ? ` (${l.size})` : ""} × {l.qty}
-              </span>
+        <button
+          ref={fabRef}
+          type="button"
+          className="fab"
+          onClick={() => {
+            setSubmitError(null);
+            setPreviewOpen(true);
+          }}
+        >
+          {t.previewOrder} · {cart.count}
+        </button>
+      ) : null}
+      {previewOpen && cart.lines.length > 0 ? (
+        <div
+          className="dialog-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.previewOrder}
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            ref={dialogRef}
+            tabIndex={-1}
+            className="card dialog flex flex-col gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="font-bold text-lg">
+              {t.previewOrder} · {cart.count}
+            </div>
+            <div className="table-scroll">
+            <table className="order-table">
+              <thead>
+                <tr>
+                  <th>{t.item}</th>
+                  <th>{t.sizes}</th>
+                  <th>{t.qty}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {cart.lines.map((l) => (
+                  <tr key={`${l.productId}|${l.size}`}>
+                    <td>
+                      <div className="font-semibold">{l.model}</div>
+                      <div className="muted text-sm">{l.name}</div>
+                    </td>
+                    <td>{l.size === "" ? "—" : l.size}</td>
+                    <td className="font-bold">× {l.qty}</td>
+                    <td>
+                      <button
+                        className="btn btn-ghost !px-2 !py-0.5"
+                        onClick={() => cart.remove(l.productId, l.size)}
+                      >
+                        {t.remove}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+            {submitError ? <p className="error">{submitError}</p> : null}
+            <div className="flex gap-2">
               <button
-                className="btn btn-ghost !px-2 !py-0.5"
-                onClick={() =>
-                  cart.setQty(l.productId, l.size, l.qty - 1)
-                }
+                className="btn btn-ghost flex-1 !py-3"
+                onClick={() => setPreviewOpen(false)}
               >
-                −
+                {t.close}
               </button>
               <button
-                className="btn btn-ghost !px-2 !py-0.5"
-                onClick={() => cart.remove(l.productId, l.size)}
+                className="btn btn-primary flex-1 !py-3 text-base"
+                disabled={submitting}
+                onClick={() => void submit()}
               >
-                {t.remove}
+                {submitting ? t.submitting : t.submitOrder}
               </button>
             </div>
-          ))}
-          {submitError ? <p style={{ color: "#dc2626" }}>{submitError}</p> : null}
-          <button
-            className="btn btn-primary"
-            disabled={submitting}
-            onClick={() => void submit()}
-          >
-            {submitting ? t.submitting : t.submitOrder}
-          </button>
+          </div>
         </div>
       ) : null}
     </div>

@@ -12,7 +12,7 @@
 --   orders domain     : orders, order_items (shared with the web app)
 --   web login         : phone_to_email(text) RPC (phone -> login email)
 --   role RLS          : admin full; employee RW invoices/lines + RO catalog
---                       and RO orders; distributor RO products (no prices)
+--                       and RO orders; customer RO products (no prices)
 --                       + own-orders RW while pending, no access to the five
 --                       business tables in this app.
 --
@@ -86,6 +86,9 @@ CREATE TABLE public.invoices (
   total double precision NOT NULL,
   currency text NOT NULL,
   discount double precision NOT NULL,
+  -- Origin order for invoices created from a customer order (null =
+  -- manual invoice). Nullable so old rows and old app versions keep working.
+  order_id uuid REFERENCES public.orders (id),
   updated_at timestamptz NOT NULL DEFAULT now(),
   is_deleted boolean NOT NULL DEFAULT false,
   client_op_id text UNIQUE
@@ -123,7 +126,7 @@ CREATE TABLE public.prices (
 -- in the auth token metadata is only the fast RLS read path.
 CREATE TABLE public.profiles (
   id uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-  role text NOT NULL CHECK (role IN ('admin', 'employee', 'distributor')),
+  role text NOT NULL CHECK (role IN ('admin', 'employee', 'customer')),
   name_ar text NOT NULL,
   name_en text NOT NULL,
   phone text NOT NULL UNIQUE,
@@ -138,9 +141,9 @@ CREATE INDEX idx_profiles_phone ON public.profiles (phone);
 -- Shared with the web app (the only writer); this Flutter app reads live.
 CREATE TABLE public.orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  distributor_id uuid NOT NULL REFERENCES auth.users (id),
+  customer_id uuid NOT NULL REFERENCES auth.users (id),
   status text NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'confirmed', 'delivered', 'cancelled')),
+    CHECK (status IN ('pending', 'completed')),
   total double precision NOT NULL DEFAULT 0,
   currency text NOT NULL DEFAULT 'USD',
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -149,7 +152,7 @@ CREATE TABLE public.orders (
 );
 
 -- Child of orders (ON DELETE CASCADE); product link is non-cascading.
--- `size` mirrors invoice_lines.size (`''` = sizeless) so distributors can
+-- `size` mirrors invoice_lines.size (`''` = sizeless) so customers can
 -- order per-size quantities; the Flutter read model ignores the extra key.
 CREATE TABLE public.order_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,8 +163,8 @@ CREATE TABLE public.order_items (
   size text NOT NULL DEFAULT ''
 );
 
-CREATE INDEX idx_orders_distributor_created
-  ON public.orders (distributor_id, created_at DESC);
+CREATE INDEX idx_orders_customer_created
+  ON public.orders (customer_id, created_at DESC);
 CREATE INDEX idx_order_items_order ON public.order_items (order_id);
 
 -- ============================== triggers ==============================
@@ -230,7 +233,7 @@ AS $$
 $$;
 
 -- Phone login lookup (Phase 12): Supabase Auth is email+password, but the
--- distributor's real-world key is the phone, so the login form resolves
+-- customer's real-world key is the phone, so the login form resolves
 -- phone -> synthesized email BEFORE signing in. SECURITY DEFINER because
 -- anon callers cannot read profiles; returns NULL for unknown phones (the
 -- client shows "no account for this phone" — never an error dump).
@@ -279,13 +282,13 @@ DROP POLICY IF EXISTS admin_delete ON public.products;
 CREATE POLICY admin_delete ON public.products
   FOR DELETE USING (public.is_admin());
 
--- Distributor web app (Phase 12): catalog is visible but read-only and hides
--- soft-deleted rows. No prices table access — distributors order blind
+-- Customer web app (Phase 12): catalog is visible but read-only and hides
+-- soft-deleted rows. No prices table access — customers order blind
 -- (order_items.price is written as 0, staff price later).
-DROP POLICY IF EXISTS products_distributor_read ON public.products;
-CREATE POLICY products_distributor_read ON public.products
+DROP POLICY IF EXISTS products_customer_read ON public.products;
+CREATE POLICY products_customer_read ON public.products
   FOR SELECT
-  USING (public.current_role() = 'distributor' AND is_deleted = false);
+  USING (public.current_role() = 'customer' AND is_deleted = false);
 
 -- price_categories: staff read, admin write
 DROP POLICY IF EXISTS company_read ON public.price_categories;
@@ -358,27 +361,26 @@ CREATE POLICY orders_staff_read ON public.orders
   FOR SELECT
   USING (public.is_staff());
 
-DROP POLICY IF EXISTS orders_distributor_own_read ON public.orders;
-CREATE POLICY orders_distributor_own_read ON public.orders
+DROP POLICY IF EXISTS orders_customer_own_read ON public.orders;
+CREATE POLICY orders_customer_own_read ON public.orders
   FOR SELECT
-  USING (distributor_id = auth.uid());
+  USING (customer_id = auth.uid());
 
 -- Web-app writer path (this Flutter app never inserts).
-DROP POLICY IF EXISTS orders_distributor_own_insert ON public.orders;
-CREATE POLICY orders_distributor_own_insert ON public.orders
+DROP POLICY IF EXISTS orders_customer_own_insert ON public.orders;
+CREATE POLICY orders_customer_own_insert ON public.orders
   FOR INSERT
-  WITH CHECK (distributor_id = auth.uid());
+  WITH CHECK (customer_id = auth.uid());
 
--- Distributor self-edit (Phase 12): own orders stay editable while pending
--- (add/remove lines, change amounts, or cancel). USING pins the current row
--- to pending so confirmed/delivered history is read-only; WITH CHECK pins
--- the new row to own + pending/cancelled so a distributor can never confirm,
--- deliver, or reassign their order.
-DROP POLICY IF EXISTS orders_distributor_own_update ON public.orders;
-CREATE POLICY orders_distributor_own_update ON public.orders
+-- Customer self-edit (Phase 12): own orders stay editable while pending
+-- (add/remove lines, change amounts). USING pins the current row to pending
+-- so completed history is read-only; WITH CHECK pins the new row to own +
+-- pending so a customer can never complete or reassign their order.
+DROP POLICY IF EXISTS orders_customer_own_update ON public.orders;
+CREATE POLICY orders_customer_own_update ON public.orders
   FOR UPDATE
-  USING (distributor_id = auth.uid() AND status = 'pending')
-  WITH CHECK (distributor_id = auth.uid() AND status IN ('pending', 'cancelled'));
+  USING (customer_id = auth.uid() AND status = 'pending')
+  WITH CHECK (customer_id = auth.uid() AND status = 'pending');
 
 DROP POLICY IF EXISTS items_admin_all ON public.order_items;
 CREATE POLICY items_admin_all ON public.order_items
@@ -391,24 +393,24 @@ CREATE POLICY items_staff_read ON public.order_items
   FOR SELECT
   USING (public.is_staff());
 
-DROP POLICY IF EXISTS items_distributor_own_read ON public.order_items;
-CREATE POLICY items_distributor_own_read ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_read ON public.order_items;
+CREATE POLICY items_customer_own_read ON public.order_items
   FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM public.orders o
-      WHERE o.id = order_id AND o.distributor_id = auth.uid()
+      WHERE o.id = order_id AND o.customer_id = auth.uid()
     )
   );
 
-DROP POLICY IF EXISTS items_distributor_own_insert ON public.order_items;
-CREATE POLICY items_distributor_own_insert ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_insert ON public.order_items;
+CREATE POLICY items_customer_own_insert ON public.order_items
   FOR INSERT
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   );
@@ -416,14 +418,14 @@ CREATE POLICY items_distributor_own_insert ON public.order_items
 -- Line edits follow the parent order: writable only while the parent is the
 -- caller's own pending order (USING + WITH CHECK both gated, so lines can
 -- neither move to someone else's order nor outlive the pending window).
-DROP POLICY IF EXISTS items_distributor_own_update ON public.order_items;
-CREATE POLICY items_distributor_own_update ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_update ON public.order_items;
+CREATE POLICY items_customer_own_update ON public.order_items
   FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_items.order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   )
@@ -431,19 +433,19 @@ CREATE POLICY items_distributor_own_update ON public.order_items
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   );
 
-DROP POLICY IF EXISTS items_distributor_own_delete ON public.order_items;
-CREATE POLICY items_distributor_own_delete ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_delete ON public.order_items;
+CREATE POLICY items_customer_own_delete ON public.order_items
   FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_items.order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   );
@@ -521,42 +523,42 @@ ON CONFLICT (id) DO UPDATE SET
 -- WHERE p.role = 'admin';
 */
 
--- ============================== live upgrade: distributor web (Phase 12) ==
+-- ============================== live upgrade: customer web (Phase 12) ==
 -- The file above is fresh-install. For a LIVE project that already ran an
 -- older schema.sql, run this block instead (idempotent: DROP IF EXISTS +
 -- CREATE OR REPLACE). It adds only the Phase 12 delta — no data is touched.
 /*
-DROP POLICY IF EXISTS products_distributor_read ON public.products;
-CREATE POLICY products_distributor_read ON public.products
+DROP POLICY IF EXISTS products_customer_read ON public.products;
+CREATE POLICY products_customer_read ON public.products
   FOR SELECT
-  USING (public.current_role() = 'distributor' AND is_deleted = false);
+  USING (public.current_role() = 'customer' AND is_deleted = false);
 
-DROP POLICY IF EXISTS orders_distributor_own_update ON public.orders;
-CREATE POLICY orders_distributor_own_update ON public.orders
+DROP POLICY IF EXISTS orders_customer_own_update ON public.orders;
+CREATE POLICY orders_customer_own_update ON public.orders
   FOR UPDATE
-  USING (distributor_id = auth.uid() AND status = 'pending')
-  WITH CHECK (distributor_id = auth.uid() AND status IN ('pending', 'cancelled'));
+  USING (customer_id = auth.uid() AND status = 'pending')
+  WITH CHECK (customer_id = auth.uid() AND status = 'pending');
 
-DROP POLICY IF EXISTS items_distributor_own_insert ON public.order_items;
-CREATE POLICY items_distributor_own_insert ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_insert ON public.order_items;
+CREATE POLICY items_customer_own_insert ON public.order_items
   FOR INSERT
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   );
 
-DROP POLICY IF EXISTS items_distributor_own_update ON public.order_items;
-CREATE POLICY items_distributor_own_update ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_update ON public.order_items;
+CREATE POLICY items_customer_own_update ON public.order_items
   FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_items.order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   )
@@ -564,19 +566,19 @@ CREATE POLICY items_distributor_own_update ON public.order_items
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   );
 
-DROP POLICY IF EXISTS items_distributor_own_delete ON public.order_items;
-CREATE POLICY items_distributor_own_delete ON public.order_items
+DROP POLICY IF EXISTS items_customer_own_delete ON public.order_items;
+CREATE POLICY items_customer_own_delete ON public.order_items
   FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_items.order_id
-        AND o.distributor_id = auth.uid()
+        AND o.customer_id = auth.uid()
         AND o.status = 'pending'
     )
   );
@@ -591,11 +593,147 @@ AS $$
 $$;
 GRANT EXECUTE ON FUNCTION public.phone_to_email(text) TO anon, authenticated;
 
--- Verify (as a distributor login; expect own pending order editable):
+-- Verify (as a customer login; expect own pending order editable):
 -- SELECT * FROM public.products LIMIT 1;              -- works (catalog read)
 -- SELECT * FROM public.prices LIMIT 1;                -- 0 rows (no access)
 -- SELECT public.phone_to_email('+963000000000');      -- admin's fake_email
 ALTER TABLE public.order_items
   ADD COLUMN IF NOT EXISTS size text NOT NULL DEFAULT '';
 */
+
+-- ============================== live upgrade: order statuses ============
+-- Statuses shrink to pending/completed. If the live project holds test rows
+-- with the old statuses, either delete them first or remap them instead of
+-- deleting (delivered/confirmed -> completed keeps history):
+-- UPDATE public.orders SET status = 'completed'
+--  WHERE status IN ('confirmed', 'delivered');
+-- There is no replacement for cancelled — decide those rows explicitly.
+-- Then run (idempotent otherwise):
+-- ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_status_check;
+-- ALTER TABLE public.orders
+--   ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'completed'));
+-- DROP POLICY IF EXISTS orders_customer_own_update ON public.orders;
+-- CREATE POLICY orders_customer_own_update ON public.orders
+--   FOR UPDATE
+--   USING (customer_id = auth.uid() AND status = 'pending')
+--   WITH CHECK (customer_id = auth.uid() AND status = 'pending');
+-- Verify (expect zero rows):
+-- SELECT status, count(*) FROM public.orders
+--  WHERE status NOT IN ('pending', 'completed') GROUP BY status;
+
+-- ============================== live upgrade: invoice order link ========
+-- Run before releasing any app version that invoices from orders. Nullable:
+-- old rows, old app versions, and manual invoices are unaffected.
+-- ALTER TABLE public.invoices
+--   ADD COLUMN IF NOT EXISTS order_id uuid REFERENCES public.orders (id);
+-- Verify (expect one row, order_id present):
+-- SELECT column_name FROM information_schema.columns
+--  WHERE table_name = 'invoices' AND column_name = 'order_id';
+
+-- ============================== live upgrade: distributor -> customer rename
+-- Run once on a LIVE project created from the pre-rename schema.sql, BEFORE
+-- deploying any app version that writes customer_id / role='customer'.
+-- Choice: if the live project holds only test orders/profiles, you may delete
+-- those test rows instead of migrating them (delete order_items + orders +
+-- test profiles first), then still run the RENAME + policy section below so
+-- object names match this file. Otherwise migrate in place (idempotent
+-- otherwise: every statement below uses IF EXISTS / re-creatable forms).
+-- Order matters: widen the profiles CHECK before the role UPDATE, rename the
+-- column before (re)creating policies that reference customer_id.
+-- NOTE: auth.users raw_app_meta_data role copies ('distributor') are stamped
+-- by the invite function at invite time — re-invite or patch existing users
+-- (see the admin bootstrap block pattern) so the token role matches
+-- profiles.role, or current_role() checks will fail for renamed users.
+-- 1. Role label:
+-- ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+-- ALTER TABLE public.profiles
+--   ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'employee', 'customer'));
+-- UPDATE public.profiles SET role = 'customer' WHERE role = 'distributor';
+-- 2. Column rename (data preserved; REFERENCES target unchanged):
+-- ALTER TABLE public.orders RENAME COLUMN distributor_id TO customer_id;
+-- ALTER INDEX IF EXISTS idx_orders_distributor_created RENAME TO idx_orders_customer_created;
+-- 3. Drop OLD distributor-named policies left over from the previous schema:
+-- DROP POLICY IF EXISTS products_distributor_read ON public.products;
+-- DROP POLICY IF EXISTS orders_distributor_own_read ON public.orders;
+-- DROP POLICY IF EXISTS orders_distributor_own_insert ON public.orders;
+-- DROP POLICY IF EXISTS orders_distributor_own_update ON public.orders;
+-- DROP POLICY IF EXISTS items_distributor_own_read ON public.order_items;
+-- DROP POLICY IF EXISTS items_distributor_own_insert ON public.order_items;
+-- DROP POLICY IF EXISTS items_distributor_own_update ON public.order_items;
+-- DROP POLICY IF EXISTS items_distributor_own_delete ON public.order_items;
+-- 4. (Re)create the customer-named policies (copies of the fresh-install
+--    definitions above):
+-- DROP POLICY IF EXISTS products_customer_read ON public.products;
+-- CREATE POLICY products_customer_read ON public.products
+--   FOR SELECT
+--   USING (public.current_role() = 'customer' AND is_deleted = false);
+-- DROP POLICY IF EXISTS orders_customer_own_read ON public.orders;
+-- CREATE POLICY orders_customer_own_read ON public.orders
+--   FOR SELECT
+--   USING (customer_id = auth.uid());
+-- DROP POLICY IF EXISTS orders_customer_own_insert ON public.orders;
+-- CREATE POLICY orders_customer_own_insert ON public.orders
+--   FOR INSERT
+--   WITH CHECK (customer_id = auth.uid());
+-- DROP POLICY IF EXISTS orders_customer_own_update ON public.orders;
+-- CREATE POLICY orders_customer_own_update ON public.orders
+--   FOR UPDATE
+--   USING (customer_id = auth.uid() AND status = 'pending')
+--   WITH CHECK (customer_id = auth.uid() AND status = 'pending');
+-- DROP POLICY IF EXISTS items_customer_own_read ON public.order_items;
+-- CREATE POLICY items_customer_own_read ON public.order_items
+--   FOR SELECT
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM public.orders o
+--       WHERE o.id = order_id AND o.customer_id = auth.uid()
+--     )
+--   );
+-- DROP POLICY IF EXISTS items_customer_own_insert ON public.order_items;
+-- CREATE POLICY items_customer_own_insert ON public.order_items
+--   FOR INSERT
+--   WITH CHECK (
+--     EXISTS (
+--       SELECT 1 FROM public.orders o
+--       WHERE o.id = order_id
+--         AND o.customer_id = auth.uid()
+--         AND o.status = 'pending'
+--     )
+--   );
+-- DROP POLICY IF EXISTS items_customer_own_update ON public.order_items;
+-- CREATE POLICY items_customer_own_update ON public.order_items
+--   FOR UPDATE
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM public.orders o
+--       WHERE o.id = order_items.order_id
+--         AND o.customer_id = auth.uid()
+--         AND o.status = 'pending'
+--     )
+--   )
+--   WITH CHECK (
+--     EXISTS (
+--       SELECT 1 FROM public.orders o
+--       WHERE o.id = order_id
+--         AND o.customer_id = auth.uid()
+--         AND o.status = 'pending'
+--     )
+--   );
+-- DROP POLICY IF EXISTS items_customer_own_delete ON public.order_items;
+-- CREATE POLICY items_customer_own_delete ON public.order_items
+--   FOR DELETE
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM public.orders o
+--       WHERE o.id = order_items.order_id
+--         AND o.customer_id = auth.uid()
+--         AND o.status = 'pending'
+--     )
+--   );
+-- Verify (expect zero rows / no 'distributor' leftovers):
+-- SELECT role, count(*) FROM public.profiles WHERE role = 'distributor' GROUP BY role;
+-- SELECT column_name FROM information_schema.columns
+--  WHERE table_name = 'orders' AND column_name = 'distributor_id';
+-- SELECT policyname FROM pg_policies
+--  WHERE policyname LIKE '%distributor%';
 

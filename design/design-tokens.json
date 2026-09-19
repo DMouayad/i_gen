@@ -1,0 +1,159 @@
+{
+  "$description": "i_gen shared design tokens (W3C DTCG shape). SINGLE SOURCE OF TRUTH for the design language of both apps — never hand-mirror values. Outputs: web/app/tokens.css (CSS vars) + mobile/lib/design/tokens.dart (Dart consts). Primitives follow the MedCorset reference (warm ivory surfaces) with a steel-blue brand (#1f497d).",
+  "color": {
+    "brand": {
+      "primary": {
+        "$value": "#1f497d",
+        "$type": "color"
+      },
+      "primary-deep": {
+        "$value": "#142e4f",
+        "$type": "color"
+      },
+      "light": {
+        "$value": "#e9eef5",
+        "$type": "color"
+      },
+      "on-primary": {
+        "$value": "#ffffff",
+        "$type": "color"
+      }
+    },
+    "surface": {
+      "0": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "1": {
+        "$value": "#fbfaf8",
+        "$type": "color"
+      },
+      "2": {
+        "$value": "#f5efe7",
+        "$type": "color"
+      },
+      "3": {
+        "$value": "#edf1f7",
+        "$type": "color"
+      }
+    },
+    "text": {
+      "primary": {
+        "$value": "#0a1f24",
+        "$type": "color"
+      },
+      "muted": {
+        "$value": "#64748b",
+        "$type": "color"
+      }
+    },
+    "border": {
+      "$value": "#e2ddd2",
+      "$type": "color"
+    },
+    "beige": {
+      "base": {
+        "$value": "#e8dfcf",
+        "$type": "color"
+      },
+      "highlight": {
+        "$value": "#f5eee4",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "#bfae99",
+        "$type": "color"
+      }
+    },
+    "ink": {
+      "black": {
+        "$value": "#1a1a1a",
+        "$type": "color"
+      }
+    }
+  },
+  "dark": {
+    "background": {
+      "$value": "#101d29",
+      "$type": "color"
+    },
+    "surface": {
+      "$value": "#16293a",
+      "$type": "color"
+    },
+    "card": {
+      "$value": "#1a3040",
+      "$type": "color"
+    },
+    "foreground": {
+      "$value": "#edf2f6",
+      "$type": "color"
+    },
+    "muted": {
+      "$value": "#8fa3b0",
+      "$type": "color"
+    },
+    "border": {
+      "$value": "#274357",
+      "$type": "color"
+    },
+    "primary": {
+      "$value": "#9db9d9",
+      "$type": "color"
+    },
+    "primary-deep": {
+      "$value": "#142e4f",
+      "$type": "color"
+    }
+  },
+  "font": {
+    "sans": {
+      "$value": "\"Readex Pro\", \"IBM Plex Sans Arabic\", ui-sans-serif, system-ui, sans-serif",
+      "$type": "fontFamily"
+    },
+    "arabic": {
+      "$value": "\"IBM Plex Sans Arabic\", \"Readex Pro\", ui-sans-serif, system-ui, sans-serif",
+      "$type": "fontFamily"
+    }
+  },
+  "radius": {
+    "control": {
+      "$value": 8,
+      "$type": "dimension"
+    },
+    "card": {
+      "$value": 16,
+      "$type": "dimension"
+    },
+    "dialog": {
+      "$value": 12,
+      "$type": "dimension"
+    },
+    "pill": {
+      "$value": 999,
+      "$type": "dimension"
+    }
+  },
+  "space": {
+    "xs": {
+      "$value": 4,
+      "$type": "dimension"
+    },
+    "sm": {
+      "$value": 8,
+      "$type": "dimension"
+    },
+    "md": {
+      "$value": 16,
+      "$type": "dimension"
+    },
+    "lg": {
+      "$value": 24,
+      "$type": "dimension"
+    },
+    "xl": {
+      "$value": 32,
+      "$type": "dimension"
+    }
+  }
+}

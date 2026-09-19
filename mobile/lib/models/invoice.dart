@@ -9,6 +9,10 @@ class Invoice {
   final String currency;
   final double discount;
 
+  /// Server order uuid this invoice was made from (null = manual invoice).
+  /// Nullable + lenient parse: pre-v5 rows simply have none.
+  final String? orderId;
+
   const Invoice({
     required this.id,
     required this.customerName,
@@ -17,6 +21,7 @@ class Invoice {
     required this.currency,
     this.discount = 0,
     this.lines = const [],
+    this.orderId,
   });
   static Invoice? fromMap(Map<String, dynamic> map) {
     if (map case {
@@ -35,6 +40,7 @@ class Invoice {
         discount: discount,
         currency: currency,
         lines: [],
+        orderId: map['order_id']?.toString(),
       );
     }
     return null;
@@ -58,6 +64,7 @@ class Invoice {
     double? total,
     double? discount,
     List<InvoiceLine>? lines,
+    String? orderId,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -67,6 +74,8 @@ class Invoice {
       total: total ?? this.total,
       lines: lines ?? this.lines,
       discount: discount ?? this.discount,
+      // Origin never changes after creation, so plain fallback is enough.
+      orderId: orderId ?? this.orderId,
     );
   }
 }

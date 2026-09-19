@@ -8,7 +8,7 @@ void main() {
     test('parses the closed role set case-insensitively', () {
       expect(UserRole.tryParse('admin'), UserRole.admin);
       expect(UserRole.tryParse('Employee'), UserRole.employee);
-      expect(UserRole.tryParse(' DISTRIBUTOR '), UserRole.distributor);
+      expect(UserRole.tryParse(' CUSTOMER '), UserRole.customer);
     });
 
     test('unknown or missing roles parse to null (unprivileged)', () {
@@ -49,7 +49,7 @@ void main() {
     test('Order.fromMap parses a server row', () {
       final order = Order.fromMap({
         'id': 'o1',
-        'distributor_id': 'd1',
+        'customer_id': 'd1',
         'status': 'pending',
         'total': 150,
         'currency': 'USD',
@@ -77,16 +77,34 @@ void main() {
       expect(OrderItem.fromMap({'id': 'i1'}), isNull);
     });
 
-    test('Distributor.fromMap parses the narrow directory projection', () {
-      final d = Distributor.fromMap({
+    test('OrderItem.fromMap reads the embedded product model, else null', () {
+      final withEmbed = OrderItem.fromMap({
+        'id': 'i1',
+        'order_id': 'o1',
+        'amount': 2,
+        'price': 25.5,
+        'products': {'model': 'A1'},
+      });
+      expect(withEmbed!.productModel, 'A1');
+      final withoutEmbed = OrderItem.fromMap({
+        'id': 'i1',
+        'order_id': 'o1',
+        'amount': 2,
+        'price': 25.5,
+      });
+      expect(withoutEmbed!.productModel, isNull);
+    });
+
+    test('Customer.fromMap parses the narrow directory projection', () {
+      final d = Customer.fromMap({
         'id': 'd1',
         'name_ar': 'موزع',
-        'name_en': 'Distributor',
+        'name_en': 'Customer',
         'phone': '+963000000001',
       });
       expect(d, isNotNull);
       expect(d!.phone, '+963000000001');
-      expect(Distributor.fromMap({'id': 'd1', 'phone': 'x'}), isNull);
+      expect(Customer.fromMap({'id': 'd1', 'phone': 'x'}), isNull);
     });
   });
 }

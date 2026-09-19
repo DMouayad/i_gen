@@ -1,0 +1,46 @@
+/* Mirror of design/design-tokens.json (repo root) — edit the JSON first,
+   then mirror the values here. Never invent palette values in components. */
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #1f497d;
+  --color-brand-deep: #142e4f;
+  --color-brand-light: #e9eef5;
+  --color-ivory-0: #ffffff;
+  --color-ivory-1: #fbfaf8;
+  --color-ivory-2: #f5efe7;
+  --color-ivory-3: #edf1f7;
+  --color-ink: #0a1f24;
+  --color-slate-muted: #64748b;
+  --color-sand-border: #e2ddd2;
+  --color-beige: #e8dfcf;
+  --color-beige-highlight: #f5eee4;
+  --color-beige-shadow: #bfae99;
+}
+
+:root {
+  color-scheme: light;
+
+  --background: var(--color-ivory-1);
+  --foreground: var(--color-ink);
+  --muted: var(--color-slate-muted);
+  --card: var(--color-ivory-0);
+  --border: var(--color-sand-border);
+  --accent: var(--color-brand);
+  --accent-fg: #ffffff;
+}
+
+/* Teal-mapped dark (kept by decision — the reference is light-only). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #101d29;
+    --foreground: #edf2f6;
+    --muted: #8fa3b0;
+    --card: #1a3040;
+    --border: #274357;
+    --accent: #9db9d9;
+    --accent-fg: #101d29;
+  }
+}

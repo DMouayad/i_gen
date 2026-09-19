@@ -20,7 +20,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ROLES = new Set(["employee", "distributor"]);
+  const ROLES = new Set(["employee", "customer"]);
 const INVITE_DOMAIN = Deno.env.get("INVITE_DOMAIN") ?? "invited.local";
 const APP_CALLBACK = Deno.env.get("APP_CALLBACK") ?? "io.invogen.app://invite-callback";
 const WEB_WELCOME_URL = Deno.env.get("WEB_WELCOME_URL") ?? "";
@@ -86,7 +86,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const role = (body["role"] ?? "").toString().trim().toLowerCase();
   const mode = ((body["mode"] ?? "invite") as string).toLowerCase();
   if (!nameAr || !nameEn || !phone) return fail(400, "Arabic name, English name, and phone are required.");
-  if (!ROLES.has(role)) return fail(400, "Role must be employee or distributor.");
+  if (!ROLES.has(role)) return fail(400, "Role must be employee or customer.");
   if (!["invite", "resend", "recovery"].includes(mode)) return fail(400, "Unknown mode.");
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });

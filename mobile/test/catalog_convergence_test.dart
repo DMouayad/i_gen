@@ -615,7 +615,7 @@ void main() {
       final remote = ConvergenceFakeGateway()
         ..deniedTables.add('products')
         ..deniedTables.add('prices');
-      const owner = 'distributor-3';
+      const owner = 'customer-3';
       remote.seed(
         'price_categories',
         ownerId: owner,

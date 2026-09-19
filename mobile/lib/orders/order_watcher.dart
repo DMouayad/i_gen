@@ -14,13 +14,13 @@ import 'package:i_gen/utils/locale_controller.dart';
 import 'order_events.dart';
 import 'order_notifier.dart';
 
-/// Watches for new distributor orders and raises one tray alert per order
+/// Watches for new customer orders and raises one tray alert per order
 /// (Phase 11): a Realtime INSERT subscription for the instant path plus a
 /// periodic [OrdersRepo] poll as the gap fallback, behind one dedupe gate.
 ///
 /// Staff-only (admin/employee): subscribes and polls while a staffer is
 /// signed in with Supabase configured; stops on logout, role change away
-/// from staff, or missing configuration. Distributors and signed-out users
+/// from staff, or missing configuration. Customers and signed-out users
 /// never subscribe, never poll, and never see a permission prompt.
 ///
 /// Dedupe: every alerted order id is persisted in [SharedPreferences]

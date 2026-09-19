@@ -1,17 +1,24 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:i_gen/auth/auth_service.dart';
 import 'package:i_gen/auth/supabase_config.dart';
+import 'package:i_gen/controllers/invoice_details_controller.dart';
+import 'package:i_gen/controllers/products_controller.dart';
+import 'package:i_gen/models/invoice.dart';
 import 'package:i_gen/models/order.dart';
+import 'package:i_gen/repos/invoice_repo.dart';
 import 'package:i_gen/repos/orders_repo.dart';
+import 'package:i_gen/screens/invoice_screen.dart';
 import 'package:i_gen/utils/context_extensions.dart';
+import 'package:i_gen/widgets/invoice_details_mobile.dart';
 
 /// Staff orders surface (Phase 10): read-only, online-first.
 ///
-/// Employees and admins browse live orders and the distributor directory;
-/// there is no create/edit path here — distributors order through the web
-/// app. Signed-in distributors see guidance toward the web app instead.
+/// Employees and admins browse live orders and the customer directory;
+/// there is no create/edit path here — customers order through the web
+/// app. Signed-in customers see guidance toward the web app instead.
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key, this._repo});
 
@@ -70,7 +77,7 @@ class OrdersScreen extends StatelessWidget {
             ),
           );
         }
-        if (snapshot.data == UserRole.distributor) {
+        if (snapshot.data == UserRole.customer) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppGaps.lg),
@@ -84,7 +91,7 @@ class OrdersScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: AppGaps.sm),
                   Text(
-                    context.l10n.ordersDistributorGuidance,
+                    context.l10n.ordersCustomerGuidance,
                     textAlign: TextAlign.center,
                     style: context.textTheme.bodyLarge,
                   ),
@@ -100,14 +107,14 @@ class OrdersScreen extends StatelessWidget {
               TabBar(
                 tabs: [
                   Tab(text: context.l10n.navOrders),
-                  Tab(text: context.l10n.distributors),
+                  Tab(text: context.l10n.customers),
                 ],
               ),
               Expanded(
                 child: TabBarView(
                   children: [
                     _OrdersList(repo: _repo),
-                    _DistributorsList(repo: _repo),
+                    _CustomersList(repo: _repo),
                   ],
                 ),
               ),
@@ -130,23 +137,106 @@ class _OrdersList extends StatefulWidget {
 
 class _OrdersListState extends State<_OrdersList> {
   late final OrdersRepo _repo;
-  late Future<List<Order>> _future;
+  late Future<
+    ({
+      List<Order> orders,
+      List<Customer> customers,
+      Map<String, int> orderInvoices,
+    })
+  >
+  _future;
   String? _statusFilter;
 
-  static const _statuses = ['pending', 'confirmed', 'delivered', 'cancelled'];
+  static const _statuses = ['pending', 'completed'];
 
   @override
   void initState() {
     super.initState();
     _repo = widget._repo ?? OrdersRepo();
-    _future = _repo.getOrders();
+    _future = _load();
   }
 
-  void _retry() => setState(() => _future = _repo.getOrders());
+  Future<
+    ({
+      List<Order> orders,
+      List<Customer> customers,
+      Map<String, int> orderInvoices,
+    })
+  >
+  _load() async {
+    final results = await Future.wait([
+      _repo.getOrders(),
+      _safeCustomers(),
+      _orderInvoiceMap(),
+    ]);
+    return (
+      orders: results[0] as List<Order>,
+      customers: results[1] as List<Customer>,
+      orderInvoices: results[2] as Map<String, int>,
+    );
+  }
+
+  /// Customers are enrichment (names on cards): a failure degrades to
+  /// `#id` titles via [_customerName] instead of hiding loaded orders.
+  Future<List<Customer>> _safeCustomers() async {
+    try {
+      return await _repo.getCustomers();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Local invoices linked to server orders. Best-effort: the marker simply
+  /// hides if the local db is unreachable.
+  Future<Map<String, int>> _orderInvoiceMap() async {
+    try {
+      return await GetIt.I.get<InvoiceRepo>().getOrderInvoiceMap();
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  void _retry() => setState(() => _future = _load());
+
+  String _customerName(
+    BuildContext context,
+    Map<String, Customer> byId,
+    Order order,
+  ) {
+    final d = byId[order.customerId];
+    if (d == null) {
+      final id = order.customerId;
+      return '#${id.length > 8 ? id.substring(0, 8) : id}';
+    }
+    return Localizations.localeOf(context).languageCode == 'ar'
+        ? d.nameAr
+        : d.nameEn;
+  }
+
+  String _statusLabel(BuildContext context, String status) {
+    return switch (status) {
+      'pending' => context.l10n.orderStatusPending,
+      'completed' => context.l10n.orderStatusCompleted,
+      // Legacy rows from before the pending/completed shrink.
+      _ => status,
+    };
+  }
+
+  String _linesSummary(Order order) {
+    return order.items
+        .map((i) => '${i.productModel ?? '—'}:${i.amount}')
+        .join(' - ');
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Order>>(
+    return FutureBuilder<
+      ({
+        List<Order> orders,
+        List<Customer> customers,
+        Map<String, int> orderInvoices,
+      })
+    >(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -174,9 +264,15 @@ class _OrdersListState extends State<_OrdersList> {
             ),
           );
         }
-        final orders = (snapshot.data ?? const <Order>[])
+        final data = snapshot.data;
+        final byId = {
+          for (final d in (data?.customers ?? const <Customer>[]))
+            d.id: d,
+        };
+        final orders = (data?.orders ?? const <Order>[])
             .where((o) => _statusFilter == null || o.status == _statusFilter)
             .toList();
+        final orderInvoices = data?.orderInvoices ?? const <String, int>{};
         if (orders.isEmpty) {
           return Column(
             children: [
@@ -224,25 +320,38 @@ class _OrdersListState extends State<_OrdersList> {
                       ),
                       child: ListTile(
                         leading: const Icon(Icons.receipt_long_outlined),
-                        title: Text(
-                          context.l10n.orderAmountTitle(
-                            order.total.toString(),
-                            order.currency,
-                          ),
-                        ),
-                        subtitle: Text(
-                          context.l10n.orderSubtitle(
-                            order.status,
-                            order.createdAt
-                                    ?.toLocal()
-                                    .toString()
-                                    .split('.')
-                                    .first ??
-                                '',
-                          ),
+                        title: Text(_customerName(context, byId, order)),
+                        subtitle: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _linesSummary(order),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              context.l10n.orderSubtitle(
+                                _statusLabel(context, order.status) +
+                                    (orderInvoices.containsKey(order.id)
+                                        ? ' · ${context.l10n.orderInvoiced}'
+                                        : ''),
+                                order.createdAt
+                                        ?.toLocal()
+                                        .toString()
+                                        .split('.')
+                                        .first ??
+                                    '',
+                              ),
+                            ),
+                          ],
                         ),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showDetail(order),
+                        onTap: () => _showDetail(
+                          order,
+                          _customerName(context, byId, order),
+                          orderInvoices[order.id],
+                        ),
                       ),
                     );
                   },
@@ -273,9 +382,7 @@ class _OrdersListState extends State<_OrdersList> {
               child: ChoiceChip(
                 label: Text(switch (status) {
                   'pending' => context.l10n.orderStatusPending,
-                  'confirmed' => context.l10n.orderStatusConfirmed,
-                  'delivered' => context.l10n.orderStatusDelivered,
-                  'cancelled' => context.l10n.orderStatusCancelled,
+                  'completed' => context.l10n.orderStatusCompleted,
                   _ => status,
                 }),
                 selected: _statusFilter == status,
@@ -290,16 +397,24 @@ class _OrdersListState extends State<_OrdersList> {
     );
   }
 
-  Future<void> _showDetail(Order order) async {
-    List<OrderItem> items = const [];
-    String? error;
-    try {
-      items = await _repo.getOrderItems(order.id);
-    } catch (e) {
-      error = e is SocketException
-          ? context.l10n.noConnectionShort
-          : context.l10n.unexpectedError('$e');
-    }
+  Widget _cell(BuildContext context, String text, {bool header = false}) {
+    final style = header
+        ? context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)
+        : context.textTheme.bodyLarge;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      child: Text(text, style: style),
+    );
+  }
+
+  Future<void> _showDetail(
+    Order order,
+    String customerName,
+    int? invoiceId,
+  ) async {
+    // Lines arrive embedded with the list query — no second fetch, so the
+    // dialog never spins or fails on its own.
+    final items = order.items;
     if (!mounted) return;
     await showDialog(
       context: context,
@@ -307,38 +422,84 @@ class _OrdersListState extends State<_OrdersList> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.dialog),
         ),
-        title: Text(context.l10n.orderDetailTitle(order.status)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(customerName),
+            const SizedBox(height: 2),
+            Text(
+              _statusLabel(context, order.status),
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.outline,
+              ),
+            ),
+          ],
+        ),
         content: SizedBox(
           width: 400,
-          child: error != null
-              ? Text(error)
-              : items.isEmpty
+          child: items.isEmpty
               ? Text(context.l10n.orderNoLines)
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final item in items)
-                      ListTile(
-                        dense: true,
-                        title: Text(
-                          context.l10n.orderItemAmount(item.amount.toString()),
-                        ),
-                        trailing: Text('${item.price}'),
+                    Table(
+                      border: TableBorder.all(
+                        color: context.colorScheme.surfaceDim,
                       ),
-                    const Divider(),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        '${context.l10n.total}: ${order.total} ${order.currency}',
-                        style: context.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      columnWidths: const {
+                        0: FlexColumnWidth(2),
+                        1: FlexColumnWidth(1),
+                      },
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: context.colorScheme.surfaceContainerLowest,
+                          ),
+                          children: [
+                            _cell(
+                              context,
+                              context.l10n.productModel,
+                              header: true,
+                            ),
+                            _cell(context, context.l10n.quantity, header: true),
+                          ],
                         ),
-                      ),
+                        for (final item in items)
+                          TableRow(
+                            children: [
+                              _cell(
+                                context,
+                                item.productModel ?? item.productId ?? '—',
+                              ),
+                              _cell(context, '${item.amount}'),
+                            ],
+                          ),
+                      ],
                     ),
                   ],
                 ),
         ),
         actions: [
+          if (items.isNotEmpty || invoiceId != null)
+            FilledButton.tonal(
+              style: const ButtonStyle(
+                minimumSize: WidgetStatePropertyAll(Size(64, 48)),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                if (invoiceId != null) {
+                  _openExistingInvoice(invoiceId);
+                } else {
+                  _openOrderInvoice(order, items, customerName);
+                }
+              },
+              child: Text(
+                invoiceId != null
+                    ? context.l10n.goToInvoice
+                    : context.l10n.createInvoice,
+              ),
+            ),
           TextButton(
             style: const ButtonStyle(
               minimumSize: WidgetStatePropertyAll(Size(64, 48)),
@@ -350,33 +511,93 @@ class _OrdersListState extends State<_OrdersList> {
       ),
     );
   }
+
+  /// Opens the linked invoice in the existing editor. Falls back to a
+  /// reload (the invoice may have been deleted elsewhere) instead of
+  /// pushing a dead editor.
+  Future<void> _openExistingInvoice(int invoiceId) async {
+    Invoice? invoice;
+    try {
+      invoice = await GetIt.I.get<InvoiceRepo>().getInvoiceById(invoiceId);
+    } catch (_) {
+      invoice = null;
+    }
+    if (!mounted) return;
+    if (invoice == null) {
+      _retry();
+      return;
+    }
+    final controller = InvoiceDetailsController(invoice);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => context.isMobile
+            ? InvoiceDetailsMobile(controller: controller)
+            : InvoiceDetails(invoiceController: controller),
+      ),
+    );
+    if (mounted) _retry();
+  }
+
+  /// Builds a prefilled invoice from the order and opens it in the existing
+  /// editor (mobile grid / desktop table by platform). Unmatched lines are
+  /// reported, never silently dropped; the order itself is untouched.
+  void _openOrderInvoice(
+    Order order,
+    List<OrderItem> items,
+    String customerName,
+  ) async {
+    final products = GetIt.I.get<ProductsController>().products;
+    final matched = InvoiceDetailsController.matchOrderLines(items, products);
+    if (!mounted) return;
+    final controller = InvoiceDetailsController.fromCustomerOrder(
+      customerName: customerName,
+      currency: order.currency,
+      lines: matched.rows,
+      orderId: order.id,
+    );
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => context.isMobile
+            ? InvoiceDetailsMobile(
+                controller: controller,
+                orderSkipped: matched.skipped,
+              )
+            : InvoiceDetails(
+                invoiceController: controller,
+                orderSkipped: matched.skipped,
+              ),
+      ),
+    );
+    // The new invoice may now link this order: reload so the marker appears.
+    if (mounted) _retry();
+  }
 }
 
-class _DistributorsList extends StatefulWidget {
-  const _DistributorsList({this._repo});
+class _CustomersList extends StatefulWidget {
+  const _CustomersList({this._repo});
 
   final OrdersRepo? _repo;
 
   @override
-  State<_DistributorsList> createState() => _DistributorsListState();
+  State<_CustomersList> createState() => _CustomersListState();
 }
 
-class _DistributorsListState extends State<_DistributorsList> {
+class _CustomersListState extends State<_CustomersList> {
   late final OrdersRepo _repo;
-  late Future<List<Distributor>> _future;
+  late Future<List<Customer>> _future;
 
   @override
   void initState() {
     super.initState();
     _repo = widget._repo ?? OrdersRepo();
-    _future = _repo.getDistributors();
+    _future = _repo.getCustomers();
   }
 
-  void _retry() => setState(() => _future = _repo.getDistributors());
+  void _retry() => setState(() => _future = _repo.getCustomers());
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Distributor>>(
+    return FutureBuilder<List<Customer>>(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -390,8 +611,8 @@ class _DistributorsListState extends State<_DistributorsList> {
               children: [
                 Text(
                   offline
-                      ? context.l10n.noConnectionDistributors
-                      : context.l10n.couldNotLoadDistributors(
+                      ? context.l10n.noConnectionCustomers
+                      : context.l10n.couldNotLoadCustomers(
                           '${snapshot.error}',
                         ),
                 ),
@@ -407,7 +628,7 @@ class _DistributorsListState extends State<_DistributorsList> {
             ),
           );
         }
-        final items = snapshot.data ?? const <Distributor>[];
+        final items = snapshot.data ?? const <Customer>[];
         if (items.isEmpty) {
           return Center(
             child: Padding(
@@ -422,7 +643,7 @@ class _DistributorsListState extends State<_DistributorsList> {
                   ),
                   const SizedBox(height: AppGaps.sm),
                   Text(
-                    context.l10n.noDistributorsYet,
+                    context.l10n.noCustomersYet,
                     textAlign: TextAlign.center,
                     style: context.textTheme.bodyLarge,
                   ),

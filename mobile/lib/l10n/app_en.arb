@@ -14,7 +14,7 @@
     "@total": { "description": "Invoice total label" },
     "addItem": "Add Item",
     "@addItem": { "description": "Button to add an invoice line item" },
-
+    "createInvoiceBtn": "Create invoice",
     "sortLabel": "SORT",
     "sortAz": "From A-Z",
     "sortZa": "From Z-A",
@@ -63,8 +63,8 @@
 
     "ordersNeedSyncConfig": "Orders need sync configuration — the app works offline.",
     "ordersSignInPrompt": "Sign in from Settings to view orders.",
-    "ordersDistributorGuidance": "Distributors place and follow orders in the web app — open your welcome link to continue there.",
-    "distributors": "Distributors",
+    "ordersCustomerGuidance": "Customers place and follow orders in the web app — open your welcome link to continue there.",
+    "customers": "Customers",
     "noConnectionOrders": "No connection — connect to view live orders.",
     "couldNotLoadOrders": "Could not load orders: {error}",
     "@couldNotLoadOrders": {
@@ -73,15 +73,8 @@
     "retry": "Retry",
     "refresh": "Refresh",
     "noOrdersYet": "No orders yet.",
-    "orderAmountTitle": "{total} {currency}",
-    "@orderAmountTitle": {
-        "placeholders": {
-            "total": { "type": "String" },
-            "currency": { "type": "String" }
-        }
-    },
     "newOrderChannelName": "New orders",
-    "newOrderChannelDescription": "Alerts when a distributor places an order.",
+    "newOrderChannelDescription": "Alerts when a customer places an order.",
     "newOrderTitle": "New order",
     "newOrderBody": "{total} {currency}",
     "@newOrderBody": {
@@ -99,30 +92,26 @@
     },
     "filterAll": "All",
     "orderStatusPending": "pending",
-    "orderStatusConfirmed": "confirmed",
-    "orderStatusDelivered": "delivered",
-    "orderStatusCancelled": "cancelled",
-    "noConnectionShort": "No connection.",
+    "orderStatusCompleted": "completed",
     "unexpectedError": "{error}",
     "@unexpectedError": {
         "placeholders": { "error": { "type": "String" } }
     },
-    "orderDetailTitle": "Order · {status}",
-    "@orderDetailTitle": {
-        "placeholders": { "status": { "type": "String" } }
-    },
     "orderNoLines": "No lines on this order.",
-    "orderItemAmount": "×{amount}",
-    "@orderItemAmount": {
-        "placeholders": { "amount": { "type": "String" } }
+    "orderInvoiced": "Invoiced",
+    "createInvoice": "Create invoice",
+    "goToInvoice": "Go to invoice",
+    "orderSkippedLines": "{count} lines skipped (product missing)",
+    "@orderSkippedLines": {
+        "placeholders": { "count": { "type": "int" } }
     },
     "close": "Close",
-    "noConnectionDistributors": "No connection — connect to view distributors.",
-    "couldNotLoadDistributors": "Could not load distributors: {error}",
-    "@couldNotLoadDistributors": {
+    "noConnectionCustomers": "No connection — connect to view customers.",
+    "couldNotLoadCustomers": "Could not load customers: {error}",
+    "@couldNotLoadCustomers": {
         "placeholders": { "error": { "type": "String" } }
     },
-    "noDistributorsYet": "No distributors yet — invite one from Settings.",
+    "noCustomersYet": "No customers yet — invite one from Settings.",
 
     "productIdColumn": "ID",
     "productAlreadyExists": "A product with model {model} already exists",
@@ -175,7 +164,7 @@
     "phoneWhatsappLabel": "Phone (WhatsApp)",
     "roleFieldLabel": "Role",
     "roleEmployee": "Employee",
-    "roleDistributor": "Distributor",
+    "roleCustomer": "Customer",
     "inviteActionLabel": "Action",
     "inviteModeNew": "New invite",
     "inviteModeResend": "Resend link",

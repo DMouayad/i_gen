@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:i_gen/auth/auth_service.dart';
+import 'package:i_gen/design/tokens.dart';
 import 'package:i_gen/di.dart';
 import 'package:i_gen/l10n/app_localizations.dart';
 import 'package:i_gen/screens/home_screen.dart';
@@ -67,10 +68,15 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(
-      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
-      seedColor: const Color.fromARGB(255, 16, 94, 197),
-    );
+    final scheme =
+        ColorScheme.fromSeed(
+          dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+          seedColor: BrandColors.primary,
+        ).copyWith(
+          // Seed math drifts toward gray-green; pin the surfaces to the token
+          // ivory so both apps share the same background language.
+          surface: BrandColors.surface1,
+        );
     return ValueListenableBuilder<Locale?>(
       valueListenable: LocaleController.instance,
       builder: (context, locale, _) {
@@ -94,7 +100,8 @@ class MainApp extends StatelessWidget {
             colorScheme: scheme,
             scaffoldBackgroundColor: scheme.surface,
             textTheme: Typography.material2021().black.apply(
-              fontFamily: 'Noto Naskh Arabic',
+              fontFamily: BrandFonts.sans,
+              fontFamilyFallback: BrandFonts.sansFallback,
             ),
             cardTheme: CardThemeData(
               elevation: 0,

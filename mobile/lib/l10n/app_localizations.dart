@@ -140,6 +140,12 @@ abstract class AppLocalizations {
   /// **'Add Item'**
   String get addItem;
 
+  /// No description provided for @createInvoiceBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Create invoice'**
+  String get createInvoiceBtn;
+
   /// No description provided for @sortLabel.
   ///
   /// In en, this message translates to:
@@ -404,17 +410,17 @@ abstract class AppLocalizations {
   /// **'Sign in from Settings to view orders.'**
   String get ordersSignInPrompt;
 
-  /// No description provided for @ordersDistributorGuidance.
+  /// No description provided for @ordersCustomerGuidance.
   ///
   /// In en, this message translates to:
-  /// **'Distributors place and follow orders in the web app — open your welcome link to continue there.'**
-  String get ordersDistributorGuidance;
+  /// **'Customers place and follow orders in the web app — open your welcome link to continue there.'**
+  String get ordersCustomerGuidance;
 
-  /// No description provided for @distributors.
+  /// No description provided for @customers.
   ///
   /// In en, this message translates to:
-  /// **'Distributors'**
-  String get distributors;
+  /// **'Customers'**
+  String get customers;
 
   /// No description provided for @noConnectionOrders.
   ///
@@ -446,12 +452,6 @@ abstract class AppLocalizations {
   /// **'No orders yet.'**
   String get noOrdersYet;
 
-  /// No description provided for @orderAmountTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'{total} {currency}'**
-  String orderAmountTitle(String total, String currency);
-
   /// No description provided for @newOrderChannelName.
   ///
   /// In en, this message translates to:
@@ -461,7 +461,7 @@ abstract class AppLocalizations {
   /// No description provided for @newOrderChannelDescription.
   ///
   /// In en, this message translates to:
-  /// **'Alerts when a distributor places an order.'**
+  /// **'Alerts when a customer places an order.'**
   String get newOrderChannelDescription;
 
   /// No description provided for @newOrderTitle.
@@ -494,29 +494,11 @@ abstract class AppLocalizations {
   /// **'pending'**
   String get orderStatusPending;
 
-  /// No description provided for @orderStatusConfirmed.
+  /// No description provided for @orderStatusCompleted.
   ///
   /// In en, this message translates to:
-  /// **'confirmed'**
-  String get orderStatusConfirmed;
-
-  /// No description provided for @orderStatusDelivered.
-  ///
-  /// In en, this message translates to:
-  /// **'delivered'**
-  String get orderStatusDelivered;
-
-  /// No description provided for @orderStatusCancelled.
-  ///
-  /// In en, this message translates to:
-  /// **'cancelled'**
-  String get orderStatusCancelled;
-
-  /// No description provided for @noConnectionShort.
-  ///
-  /// In en, this message translates to:
-  /// **'No connection.'**
-  String get noConnectionShort;
+  /// **'completed'**
+  String get orderStatusCompleted;
 
   /// No description provided for @unexpectedError.
   ///
@@ -524,23 +506,35 @@ abstract class AppLocalizations {
   /// **'{error}'**
   String unexpectedError(String error);
 
-  /// No description provided for @orderDetailTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Order · {status}'**
-  String orderDetailTitle(String status);
-
   /// No description provided for @orderNoLines.
   ///
   /// In en, this message translates to:
   /// **'No lines on this order.'**
   String get orderNoLines;
 
-  /// No description provided for @orderItemAmount.
+  /// No description provided for @orderInvoiced.
   ///
   /// In en, this message translates to:
-  /// **'×{amount}'**
-  String orderItemAmount(String amount);
+  /// **'Invoiced'**
+  String get orderInvoiced;
+
+  /// No description provided for @createInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Create invoice'**
+  String get createInvoice;
+
+  /// No description provided for @goToInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to invoice'**
+  String get goToInvoice;
+
+  /// No description provided for @orderSkippedLines.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} lines skipped (product missing)'**
+  String orderSkippedLines(int count);
 
   /// No description provided for @close.
   ///
@@ -548,23 +542,23 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get close;
 
-  /// No description provided for @noConnectionDistributors.
+  /// No description provided for @noConnectionCustomers.
   ///
   /// In en, this message translates to:
-  /// **'No connection — connect to view distributors.'**
-  String get noConnectionDistributors;
+  /// **'No connection — connect to view customers.'**
+  String get noConnectionCustomers;
 
-  /// No description provided for @couldNotLoadDistributors.
+  /// No description provided for @couldNotLoadCustomers.
   ///
   /// In en, this message translates to:
-  /// **'Could not load distributors: {error}'**
-  String couldNotLoadDistributors(String error);
+  /// **'Could not load customers: {error}'**
+  String couldNotLoadCustomers(String error);
 
-  /// No description provided for @noDistributorsYet.
+  /// No description provided for @noCustomersYet.
   ///
   /// In en, this message translates to:
-  /// **'No distributors yet — invite one from Settings.'**
-  String get noDistributorsYet;
+  /// **'No customers yet — invite one from Settings.'**
+  String get noCustomersYet;
 
   /// No description provided for @productIdColumn.
   ///
@@ -794,11 +788,11 @@ abstract class AppLocalizations {
   /// **'Employee'**
   String get roleEmployee;
 
-  /// No description provided for @roleDistributor.
+  /// No description provided for @roleCustomer.
   ///
   /// In en, this message translates to:
-  /// **'Distributor'**
-  String get roleDistributor;
+  /// **'Customer'**
+  String get roleCustomer;
 
   /// No description provided for @inviteActionLabel.
   ///

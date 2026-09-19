@@ -16,7 +16,7 @@ import 'package:i_gen/auth/supabase_config.dart';
 enum UserRole {
   admin,
   employee,
-  distributor;
+  customer;
 
   /// Parses the token-metadata copy; unknown/missing ⇒ null (treated as
   /// signed-in with no privileges until profiles refresh).
@@ -26,8 +26,8 @@ enum UserRole {
         return UserRole.admin;
       case 'employee':
         return UserRole.employee;
-      case 'distributor':
-        return UserRole.distributor;
+      case 'customer':
+        return UserRole.customer;
       default:
         return null;
     }
